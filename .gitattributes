@@ -1,0 +1,5 @@
+# Los scripts que se ejecutan dentro del contenedor Linux deben tener LF,
+# aunque el repo se clone en Windows (si no, bash falla con "\r: command not found").
+* text=auto
+*.sh  text eol=lf
+*.sql text eol=lf

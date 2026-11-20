@@ -1,0 +1,56 @@
+name: simon-geo
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: simon-geo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-simon_geo}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev}
+      TZ: UTC
+      PGTZ: UTC
+      # Credenciales de los usuarios de aplicación (los crea db/init/07_users.sh)
+      APP_INGEST_PASSWORD: ${APP_INGEST_PASSWORD:-ingest_dev}
+      APP_ETL_PASSWORD: ${APP_ETL_PASSWORD:-etl_dev}
+      APP_ANALYST_PASSWORD: ${APP_ANALYST_PASSWORD:-analyst_dev}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-admin_dev}
+    # Ajustes orientados a carga analítica + ingesta masiva (ver DESIGN.md)
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - work_mem=32MB
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - max_wal_size=2GB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - jit=off
+      - -c
+      - timezone=UTC
+    shm_size: 1gb # el default de Docker (64MB) rompe las consultas paralelas
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # -h 127.0.0.1: durante la inicialización Postgres solo escucha por socket
+      # Unix; por TCP solo responde cuando ya terminaron los scripts de db/init.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+volumes:
+  pgdata:
