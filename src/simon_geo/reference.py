@@ -13,6 +13,7 @@ import psycopg
 import shapely
 
 from simon_geo.domain import Geofence, Vehicle, ZoneType
+from simon_geo.parameters import PipelineParameters
 from simon_geo.spatial.geofencing import GeofenceIndex
 from simon_geo.spatial.routes import PlannedRoute
 
@@ -158,3 +159,10 @@ def load_reference(conn: psycopg.Connection) -> ReferenceData:
         }
 
     return ReferenceData(vehicles, GeofenceIndex(geofences), routes)
+
+
+def load_parameters(conn: psycopg.Connection) -> PipelineParameters:
+    """Parámetros de negocio vigentes en ``ops.parameter``."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT name, value FROM ops.parameter")
+        return PipelineParameters.from_mapping(dict(cur.fetchall()))

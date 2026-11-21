@@ -70,7 +70,22 @@ En otra terminal:
 python -m simon_geo.simulator --out data/telemetry.jsonl --api-url http://localhost:8000
 ```
 
-## 7. Pruebas
+## 7. Procesar Bronce → Plata → Oro
+
+```bash
+python -m simon_geo.processing              # procesa lo pendiente y termina
+python -m simon_geo.processing --loop -i 10 # cada 10 s, hasta Ctrl+C
+```
+
+Cada lote enriquece lo nuevo de Bronce (geocercas, excesos de velocidad, riesgo de
+combustible), escribe `silver.telemetry_enriched` y `silver.alert`, avanza el watermark
+y refresca las vistas de `gold`. Al terminar imprime un resumen JSON del lote.
+Es seguro ejecutarlo varias veces: lo ya procesado no se repite.
+
+Opciones: `--lookback-min` (historia que se relee para continuar cada traza, 120 por
+defecto), `--settle-s` y `--no-gold`.
+
+## 8. Pruebas
 
 ```bash
 pytest -m "not integration"   # unitarias: no requieren base de datos

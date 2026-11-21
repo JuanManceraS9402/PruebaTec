@@ -22,6 +22,9 @@
 
 ## 2. Restricciones del PC anterior
 
+> **PC nuevo (2026-11-20):** tampoco tiene Docker. El repo ya está en GitHub
+> (`JuanManceraS9402/PruebaTec`) y la CI es la que ejecuta el SQL contra PostGIS.
+
 - No se podía instalar nada: **no había Docker ni PostgreSQL**. Por eso **el SQL nunca se ha ejecutado**.
   - Solo se validó la sintaxis con `pglast`.
   - La ejecución real la hará la CI de GitHub Actions.
@@ -37,7 +40,7 @@ pip install -e ".[dev,dashboard]"
 
 # 2. Verificar que todo sigue verde
 ruff check . && ruff format --check .
-pytest -m "not integration"       # esperado: 122 passed
+pytest -m "not integration"       # esperado: 133 passed
 
 # 3. Git con tu identidad (local al repo)
 git init -b main
@@ -124,14 +127,9 @@ REQUIRE_DB=1 pytest -m integration -v
 
 ## 5. Pendiente, en orden de prioridad
 
-1. **Worker Bronce → Plata → Oro** (`src/simon_geo/processing/worker.py` y `python -m simon_geo.processing`). Pasos:
-   - leer `ops.watermark` (`bronze_to_silver`), que avanza por `ingested_at`;
-   - por cada vehículo con datos nuevos, reprocesar con una **ventana de lookback** para que el estado del track sea continuo;
-   - ejecutar `BRONZE_POINTS_WITH_GEOFENCES`, luego `load_reference()`, luego `SilverEnricher.enrich(points, geofences_by_point)`;
-   - hacer upsert en `silver.telemetry_enriched` e `INSERT ... ON CONFLICT DO NOTHING` en `silver.alert`;
-   - avanzar el watermark en la misma transacción y llamar a `gold.refresh_all()`;
-   - usar el rol `DbRole.ETL`;
-   - escribir un test de integración: ingesta del escenario, worker, y comprobar que en BD aparecen las alertas esperadas de la tabla anterior.
+1. ~~Worker Bronce → Plata → Oro~~ **HECHO** (2026-11-20). `processing/worker.py` y `python -m simon_geo.processing`:
+   - watermark por `ingested_at` con `FOR UPDATE`; lookback de 2 h para continuar el estado de la traza; escribe desde el primer `event_ts` nuevo (upsert de puntos, borrado y reinserción de alertas del rango, para corregir con datos tardíos); refresco de Oro en transacción aparte.
+   - 11 tests unitarios (`tests/unit/test_worker.py`) y 7 de integración (`tests/integration/test_worker.py`). **Los de integración aún no se han ejecutado** (no hay Docker en este PC; los correrá la CI).
 2. **Benchmark Big Data** (pesa el 20 %). Pasos:
    - generador masivo (millones de filas) que cargue con `COPY`;
    - `EXPLAIN (ANALYZE, BUFFERS)` de consultas típicas (puntos en geocerca, ventana temporal y vehículo, heatmap), comparando sin y con índices GiST/BRIN y la poda de particiones;
