@@ -17,7 +17,7 @@ import pydeck as pdk
 import streamlit as st
 
 from simon_geo.config import DbRole, get_settings
-from simon_geo.dashboard import data
+from simon_geo.dashboard import charts, data
 from simon_geo.dashboard.views import (
     HEATMAP_COLORS,
     HOTSPOT_COLOR,
@@ -33,6 +33,7 @@ from simon_geo.dashboard.views import (
     view_for,
     with_colors,
 )
+from simon_geo.parameters import PipelineParameters
 
 ROLES = {"Analista BI (IDs enmascarados)": DbRole.ANALYST, "Administrador": DbRole.ADMIN}
 TRACK_COLORS = [
@@ -89,6 +90,14 @@ def load_day(role: DbRole, day: date) -> tuple[pd.DataFrame, pd.DataFrame]:
     return data.daily_kpis(conn, day), alerts
 
 
+@st.cache_data(ttl=CACHE_TTL_S, show_spinner=False)
+def load_profile(role: DbRole, day: date, vehicle_key: str) -> pd.DataFrame:
+    profile = data.vehicle_profile(conn_for(role), day, vehicle_key)
+    if len(profile):
+        profile["event_ts"] = pd.to_datetime(profile["event_ts"], utc=True).dt.tz_convert(LOCAL_TZ)
+    return profile
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def load_static(role: DbRole) -> tuple[pd.DataFrame, pd.DataFrame, tuple[str, bool]]:
     conn = conn_for(role)
@@ -126,7 +135,8 @@ def track_layer(tracks: list[dict]) -> pdk.Layer:
         id="tracks",
         get_path="path",
         get_color="color",
-        width_min_pixels=3,
+        get_width="width",
+        width_units="pixels",
         pickable=True,
     )
 
@@ -286,23 +296,48 @@ def main() -> None:
 
     day = st.sidebar.selectbox("Día (hora de Bogotá)", days, format_func=lambda d: f"{d:%Y-%m-%d}")
     kpis, alerts = load_day(role, day)
-    labels = {vehicle_label(r.vehicle_id, r.vehicle_key): r.vehicle_key for r in kpis.itertuples()}
+    # El color sigue al vehículo (orden estable por clave), no a su posición en el
+    # ranking: filtrar vehículos no repinta a los demás, y mapa y gráficos coinciden.
+    track_color = {
+        key: TRACK_COLORS[i % len(TRACK_COLORS)]
+        for i, key in enumerate(sorted(kpis["vehicle_key"]))
+    }
+    kpis = kpis.assign(
+        label=[vehicle_label(r.vehicle_id, r.vehicle_key) for r in kpis.itertuples()]
+    )
+    labels = dict(zip(kpis["label"], kpis["vehicle_key"], strict=True))
     chosen = st.sidebar.multiselect("Vehículos", list(labels), default=list(labels))
     keys = {labels[c] for c in chosen}
     kpis = kpis[kpis["vehicle_key"].isin(keys)]
     alerts = alerts[alerts["vehicle_key"].isin(keys)]
 
     render_kpis(kpis, alerts)
+    if kpis.empty:
+        st.info("Elige al menos un vehículo en la barra lateral.")
+        st.stop()
+
+    # Vehículo enfocado: el que se eligió con clic en el ranking (el estado del gráfico
+    # ya está disponible al principio de la recarga) o, si no hay, el de peor score.
+    picked = [
+        p["vehicle_key"]
+        for p in st.session_state.get("ranking", {}).get("selection", {}).get(charts.SELECTION, [])
+        if p.get("vehicle_key") in keys
+    ]
+    focus = picked[0] if picked else kpis["vehicle_key"].iloc[0]
 
     tracks = [
         {
-            "name": vehicle_label(r.vehicle_id, r.vehicle_key),
+            "name": r.label,
             "path": line_path(r.track_geojson),
-            "color": TRACK_COLORS[i % len(TRACK_COLORS)],
-            "title": vehicle_label(r.vehicle_id, r.vehicle_key),
+            "color": [
+                *track_color[r.vehicle_key],
+                255 if not picked or r.vehicle_key == focus else 70,
+            ],
+            "width": 6 if picked and r.vehicle_key == focus else 3,
+            "title": r.label,
             "body": f"{r.distance_km} km recorridos · Driver Score {r.driver_score}",
         }
-        for i, r in enumerate(kpis.itertuples())
+        for r in kpis.itertuples()
         if r.track_geojson
     ]
     layers = []
@@ -335,16 +370,46 @@ def main() -> None:
         legend = build_legend(
             enabled,
             zones=zip(geofences["zone_type"], geofences["speed_limit_kmh"], strict=True),
-            tracks=((t["name"], t["color"]) for t in tracks),
+            tracks=((t["name"], t["color"][:3]) for t in tracks),
             severities=alerts["severity"],
         )
         st.html(legend_html(legend))
 
-    left, right = st.columns([3, 2])
-    with left:
-        st.subheader("Driver Score")
+    hex_colors = {k: charts.hex_color(c) for k, c in track_color.items()}
+    rank_col, profile_col = st.columns([2, 3], gap="large")
+    with rank_col:
+        st.subheader("Ranking de Driver Score")
+        st.caption("Clic en una barra para ver su perfil y resaltar su ruta · doble clic: quitar.")
+        st.altair_chart(charts.score_ranking(kpis, hex_colors), key="ranking", on_select="rerun")
+    with profile_col:
+        focus_label = kpis.loc[kpis["vehicle_key"] == focus, "label"].iloc[0]
+        st.subheader(f"Perfil del día · {focus_label}")
+        st.caption(
+            "Arrastra para desplazar, rueda del mouse para hacer zoom, doble clic para volver."
+        )
+        profile = load_profile(role, day, focus)
+        if profile.empty:
+            st.info("Sin telemetría enriquecida para este vehículo en el día.")
+        else:
+            st.altair_chart(
+                charts.vehicle_profile(
+                    profile, hex_colors[focus], PipelineParameters().fuel_safety_factor
+                )
+            )
+
+    if len(alerts):
+        zone_col, time_col = st.columns(2, gap="large")
+        with zone_col:
+            st.subheader("Infracciones por zona")
+            st.altair_chart(charts.infractions_by_zone(alerts))
+        with time_col:
+            st.subheader("Infracciones en el tiempo")
+            st.altair_chart(charts.infractions_over_time(alerts))
+
+    with st.expander("Tablas de detalle"):
+        st.markdown("**Driver Score por vehículo**")
         st.dataframe(
-            kpis.drop(columns=["track_geojson"]),
+            kpis.drop(columns=["track_geojson", "label"]),
             hide_index=True,
             column_config={
                 "driver_score": st.column_config.ProgressColumn(
@@ -353,8 +418,7 @@ def main() -> None:
                 "speeding_time_pct": st.column_config.NumberColumn("% tiempo en exceso"),
             },
         )
-    with right:
-        st.subheader("Infracciones del día")
+        st.markdown("**Infracciones del día**")
         st.dataframe(
             alerts[
                 [

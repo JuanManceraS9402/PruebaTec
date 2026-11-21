@@ -52,6 +52,18 @@ FROM analytics.geofence
 ORDER BY geofence_id
 """
 
+# Perfil de un vehículo en un día local; el rango sobre event_ts permite podar particiones
+_PROFILE: Final = """
+SELECT event_ts, speed_kmh, applied_speed_limit_kmh, speed_excess_kmh, is_speeding,
+       fuel_level_pct, est_range_km, remaining_route_km, is_low_fuel_risk
+FROM analytics.telemetry_enriched
+WHERE vehicle_key = %(vehicle_key)s
+  AND event_ts >= (%(day)s::date)::timestamp AT TIME ZONE 'America/Bogota'
+  AND event_ts <  (%(day)s::date + 1)::timestamp AT TIME ZONE 'America/Bogota'
+  AND NOT is_gps_outlier
+ORDER BY event_ts
+"""
+
 _WHOAMI: Final = "SELECT current_user, security.is_admin()"
 
 
@@ -77,6 +89,11 @@ def infractions(conn: psycopg.Connection, day: date) -> pd.DataFrame:
 def infraction_hotspots(conn: psycopg.Connection) -> pd.DataFrame:
     """Zonas calientes históricas (DBSCAN en la capa Oro), de mayor a menor."""
     return _frame(conn, _HOTSPOTS)
+
+
+def vehicle_profile(conn: psycopg.Connection, day: date, vehicle_key: str) -> pd.DataFrame:
+    """Serie temporal (velocidad, límite, combustible) de un vehículo en un día local."""
+    return _frame(conn, _PROFILE, {"day": day, "vehicle_key": vehicle_key})
 
 
 def geofences(conn: psycopg.Connection) -> pd.DataFrame:

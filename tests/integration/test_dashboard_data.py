@@ -35,6 +35,9 @@ def test_queries_run_and_mask_by_role(conn, seeded, role, pattern) -> None:
         ids = list(kpis["vehicle_id"]) + list(alerts["vehicle_id"])
         assert all(pattern.match(v) for v in ids), ids[:5]
         assert kpis["vehicle_key"].str.startswith("VK-").all()
+        for key in kpis["vehicle_key"][:1]:
+            profile = data.vehicle_profile(c, day, key)
+            assert profile["event_ts"].is_monotonic_increasing
 
 
 def test_app_renders_with_database(seeded) -> None:
