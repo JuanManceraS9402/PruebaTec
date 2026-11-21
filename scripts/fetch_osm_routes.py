@@ -3,7 +3,8 @@
 Herramienta de desarrollo: se ejecuta UNA vez y el GeoJSON resultante se versiona,
 así el proyecto funciona sin internet y es reproducible.
 
-python scripts/fetch_osm_routes.py
+python scripts/fetch_osm_routes.py                 # todo
+python scripts/fetch_osm_routes.py --only R04,R05  # solo esas rutas; el resto se conserva
 
 * Las rutas se calculan con OSRM (servidor público de demostración) sobre la red
   vial de OpenStreetMap, pasando por puntos de paso verificados sobre las
@@ -18,6 +19,7 @@ Datos © colaboradores de OpenStreetMap, licencia ODbL.
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 from typing import Any, Final
@@ -41,6 +43,18 @@ PORTAL_SUR: Final = (-74.1693, 4.5972)  # Autopista Sur (Av. Calle 57R Sur)
 SOACHA: Final = (-74.2314, 4.5604)  # Autopista Sur, Soacha
 PARKWAY: Final = (-74.0750, 4.6295)  # Park Way, Teusaquillo (zona escolar)
 CALLE26_CENTRO: Final = (-74.0704, 4.6120)  # Av. Calle 26, Centro Internacional
+# Rutas por tramos críticos de siniestralidad (SDM 2022-2025, ver fetch_bogota_open_data)
+AMERICAS_W: Final = (-74.1461, 4.6311)  # Av. Américas entre Cra 80 y Av. Boyacá
+AMERICAS_E: Final = (-74.1198, 4.6285)  # Av. Américas entre Cra 50 y Cra 71A
+NQS_SUR: Final = (-74.0970, 4.6086)  # Av. NQS entre Calle 22A y Calle 8 sur
+CALLE19: Final = (-74.0775, 4.6093)  # Calle 19 entre Cra 9 y Cra 20
+CALI_CENTRO: Final = (-74.1552, 4.6418)  # Av. Ciudad de Cali entre Diag. 3 y Calle 6D
+CALI_SUR: Final = (-74.1689, 4.6299)  # Av. Ciudad de Cali entre Calle 40B y 45 bis sur
+AV_BOSA: Final = (-74.1899, 4.6238)  # Av. Bosa entre Cra 87 y Cra 88C
+CALLE72_BOYACA: Final = (-74.1009, 4.6917)  # Calle 72 entre Av. Boyacá y Av. Ciudad de Cali
+BOYACA_CALLE80: Final = (-74.0891, 4.6954)  # Av. Boyacá x Calle 80
+CALI_CRA91: Final = (-74.0928, 4.7172)  # Av. Ciudad de Cali x Cra 91
+SUBA_CALI: Final = (-74.0963, 4.7466)  # Av. Suba x Av. Ciudad de Cali
 
 ROUTES: Final = {
     "R01": (
@@ -51,6 +65,18 @@ ROUTES: Final = {
     "R03": (
         "Fontibón → Calle 26 → Teusaquillo → Centro",
         [DEPOT, CALLE26_FONTIBON, PARKWAY, CALLE26_CENTRO],
+    ),
+    "R04": (
+        "Fontibón → Av. Américas → NQS → Centro",
+        [DEPOT, AMERICAS_W, AMERICAS_E, NQS_SUR, CALLE19],
+    ),
+    "R05": (
+        "Fontibón → Av. Ciudad de Cali → Kennedy → Bosa",
+        [DEPOT, CALI_CENTRO, CALI_SUR, AV_BOSA],
+    ),
+    "R06": (
+        "Fontibón → Av. Boyacá → Calle 80 → Suba",
+        [DEPOT, CALLE72_BOYACA, BOYACA_CALLE80, CALI_CRA91, SUBA_CALI],
     ),
 }
 
@@ -85,10 +111,26 @@ def fetch_route(client: httpx.Client, waypoints: list[tuple[float, float]]) -> d
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--only", help="Rutas a (re)calcular, p. ej. R04,R05; conserva el resto")
+    args = parser.parse_args()
+    only = set(args.only.split(",")) if args.only else set(ROUTES)
+
     features: list[dict[str, Any]] = []
+    if args.only and OUT.exists():  # conservar lo ya versionado que no se recalcula
+        kept = json.loads(OUT.read_text(encoding="utf-8"))["features"]
+        features = [
+            f
+            for f in kept
+            if not (f["properties"]["kind"] == "route" and f["properties"]["code"] in only)
+            and not (f["properties"]["kind"] == "corridor" and f["properties"]["route"] in only)
+            and f["properties"]["kind"] != "landmark"
+        ]
     routes: dict[str, dict[str, Any]] = {}
     with httpx.Client(timeout=30, headers={"User-Agent": "simon-geo-demo/0.1"}) as client:
         for code, (name, waypoints) in ROUTES.items():
+            if code not in only:
+                continue
             routes[code] = fetch_route(client, waypoints)
             geometry = LineString(routes[code]["routes"][0]["geometry"]["coordinates"])
             features.append(
@@ -101,6 +143,8 @@ def main() -> None:
             print(f"{code}: {routes[code]['routes'][0]['distance'] / 1000:.1f} km")
 
     for code, (route_code, road_names) in CORRIDORS.items():
+        if route_code not in only:
+            continue
         steps = [
             LineString(step["geometry"]["coordinates"])
             for leg in routes[route_code]["routes"][0]["legs"]

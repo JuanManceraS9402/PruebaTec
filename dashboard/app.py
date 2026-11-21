@@ -41,13 +41,22 @@ from simon_geo.dashboard.views import (
 from simon_geo.parameters import PipelineParameters
 
 ROLES = {"Analista BI (IDs enmascarados)": DbRole.ANALYST, "Administrador": DbRole.ADMIN}
+# Un color por vehículo (10). Okabe-Ito sin amarillo ni naranja (reservados a la
+# severidad de las alertas), completado buscando la mayor distancia OKLab con visión
+# normal, deuteranopía y protanopía: ΔE mínimo 7,6. Por debajo de 8 se exige una
+# segunda codificación, y la hay: leyenda, tooltip con el nombre, resaltado por clic y
+# "Solo el vehículo seleccionado". Luminosidad media: se ve sobre CARTO y la ortofoto.
 TRACK_COLORS = [
-    [0, 114, 178],
-    [213, 94, 0],
-    [0, 158, 115],
-    [204, 121, 167],
-    [86, 180, 233],
-    [230, 159, 0],
+    [0, 114, 178],  # #0072b2
+    [86, 180, 233],  # #56b4e9
+    [0, 158, 115],  # #009e73
+    [204, 121, 167],  # #cc79a7
+    [140, 86, 75],  # #8c564b
+    [182, 232, 128],  # #b6e880
+    [99, 110, 250],  # #636efa
+    [44, 160, 44],  # #2ca02c
+    [93, 109, 126],  # #5d6d7e
+    [0, 204, 150],  # #00cc96
 ]
 SEVERITY_WEIGHT = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
 CACHE_TTL_S = 30

@@ -107,7 +107,15 @@ class TestBogotaSeed:
         assert INDEX.containing(end_lon, end_lat) == []
 
     @pytest.mark.parametrize(
-        ("code", "low", "high"), [("R01", 25, 30), ("R02", 21, 26), ("R03", 16, 20)]
+        ("code", "low", "high"),
+        [
+            ("R01", 25, 30),
+            ("R02", 21, 26),
+            ("R03", 16, 20),
+            ("R04", 18, 22),
+            ("R05", 9, 13),
+            ("R06", 23, 27),
+        ],
     )
     def test_route_lengths_plausible(self, code: str, low: float, high: float) -> None:
         route = next(r for r in bogota.routes() if r.code == code)
@@ -119,6 +127,21 @@ class TestBogotaSeed:
         for code, route in (("BOG-AUTONORTE", "R01"), ("BOG-AUTOSUR", "R02")):
             inside = GEOFENCES[code].geometry.intersection(routes[route].geometry)
             assert inside.length > 0.02, code  # > ~2 km de ruta dentro del corredor
+
+    @pytest.mark.parametrize(
+        ("code", "critical"),
+        [
+            ("R04", {"SDM-TC-AME_W", "SDM-TC-AME_E", "SDM-TC-NQS_S"}),
+            ("R05", {"SDM-TC-CALI_C", "SDM-TC-CALI_S", "SDM-TC-BOSA"}),
+            ("R06", {"SDM-TC-CALI_N", "SDM-TC-CL72", "SDM-PC-P14"}),
+        ],
+    )
+    def test_new_routes_cross_official_critical_segments(
+        self, code: str, critical: set[str]
+    ) -> None:
+        route = next(r for r in bogota.routes() if r.code == code)
+        crossed = {c for c in critical if GEOFENCES[c].geometry.intersects(route.geometry)}
+        assert crossed == critical
 
     def test_every_route_crosses_real_school_zones(self) -> None:
         schools = [g for g in GEOFENCES.values() if g.zone_type is ZoneType.SCHOOL]
@@ -191,11 +214,34 @@ class TestEndToEnd:
 
 def test_driver_profiles_rank_by_time_speeding(result: EnrichmentResult) -> None:
     """Cumplido nunca excede, moderado excede a ratos y agresivo casi siempre."""
-    share: dict[str, float] = {}
-    for vid in {p.vehicle_id for p in result.points}:
+    profile = {sv.vehicle.vehicle_id: sv.driver.name for sv in bogota.scenario(T0)}
+    for vid, name in profile.items():
         pts = [p for p in result.points if p.vehicle_id == vid and not p.is_gps_outlier]
-        share[vid] = sum(p.is_speeding for p in pts) / len(pts)
-    assert share["VHC-8472-ABC"] == 0
-    for moderate in ("VHC-5521-KLM", "VHC-2048-QWE"):
-        assert 0.02 < share[moderate] < 0.40, (moderate, share[moderate])
-    assert share["VHC-1935-BOG"] > 0.80
+        share = sum(p.is_speeding for p in pts) / len(pts)
+        if name == "compliant":
+            assert share == 0, vid
+        elif name == "moderate":
+            assert 0.02 < share < 0.40, (vid, share)
+        else:
+            assert share > 0.80, (vid, share)
+
+
+def test_aggressive_drivers_get_critical_alerts_in_official_critical_zones(
+    result: EnrichmentResult,
+) -> None:
+    """En los tramos críticos de la SDM la severidad sube un nivel: los agresivos de las
+    rutas nuevas llegan a CRITICAL ahí."""
+    high_risk = {g.geofence_id for g in GEOFENCES.values() if g.zone_type is ZoneType.HIGH_RISK}
+    for vid in ("VHC-6194-PLM", "VHC-4826-JKT"):
+        assert any(
+            a.vehicle_id == vid and a.geofence_id in high_risk and a.severity.value == "CRITICAL"
+            for a in result.alerts
+        ), vid
+
+
+def test_light_vehicle_has_enough_fuel(result: EnrichmentResult) -> None:
+    assert not [
+        a
+        for a in result.alerts
+        if a.vehicle_id == "VHC-3371-MTO" and a.alert_type is AlertType.LOW_FUEL_RANGE
+    ]

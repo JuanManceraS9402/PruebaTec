@@ -27,6 +27,9 @@ Rutas (todas salen del patio de Fontibón):
   R01  Fontibón → Calle 26 → Calle 80 → Autopista Norte (Portal Norte)
   R02  Fontibón → Av. Boyacá → Autopista Sur → Soacha (sale del perímetro)
   R03  Fontibón → Calle 26 → Teusaquillo → Centro
+  R04  Fontibón → Av. Américas → NQS → Centro        (tramos críticos de Américas y NQS)
+  R05  Fontibón → Av. Ciudad de Cali → Kennedy → Bosa (tramos críticos de Cali y Bosa)
+  R06  Fontibón → Av. Boyacá → Calle 80 → Suba       (Calle 72 y puntos críticos de Cali)
 """
 
 from __future__ import annotations
@@ -126,6 +129,11 @@ def routes() -> list[PlannedRoute]:
             2, "R02", "Fontibón → Av. Boyacá → Autopista Sur → Soacha", _route_line("R02")
         ),
         PlannedRoute(3, "R03", "Fontibón → Calle 26 → Teusaquillo → Centro", _route_line("R03")),
+        PlannedRoute(4, "R04", "Fontibón → Av. Américas → NQS → Centro", _route_line("R04")),
+        PlannedRoute(
+            5, "R05", "Fontibón → Av. Ciudad de Cali → Kennedy → Bosa", _route_line("R05")
+        ),
+        PlannedRoute(6, "R06", "Fontibón → Av. Boyacá → Calle 80 → Suba", _route_line("R06")),
     ]
 
 
@@ -136,6 +144,11 @@ def vehicles() -> list[Vehicle]:
         Vehicle("VHC-5521-KLM", fuel_tank_capacity_l=120, nominal_consumption_l_100km=22),
         Vehicle("VHC-7310-TRZ", fuel_tank_capacity_l=150, nominal_consumption_l_100km=38),
         Vehicle("VHC-2048-QWE", fuel_tank_capacity_l=200, nominal_consumption_l_100km=30),
+        Vehicle("VHC-6194-PLM", fuel_tank_capacity_l=200, nominal_consumption_l_100km=34),
+        Vehicle("VHC-3371-MTO", fuel_tank_capacity_l=45, nominal_consumption_l_100km=9),
+        Vehicle("VHC-4826-JKT", fuel_tank_capacity_l=120, nominal_consumption_l_100km=24),
+        Vehicle("VHC-9053-HRD", fuel_tank_capacity_l=150, nominal_consumption_l_100km=28),
+        Vehicle("VHC-2715-SUB", fuel_tank_capacity_l=200, nominal_consumption_l_100km=31),
     ]
 
 
@@ -178,5 +191,46 @@ def scenario(start_utc: datetime) -> list[SimulatedVehicle]:
             20,
             start_utc + timedelta(minutes=12),
             refuel_at_km=6.0,
+        ),
+        # --- Rutas por tramos críticos de siniestralidad (SDM 2022-2025) ---
+        # Agresivo por Av. Américas y NQS: ~9 km de tramos críticos oficiales
+        SimulatedVehicle(
+            v["VHC-6194-PLM"],
+            r["R04"],
+            DRIVER_PROFILES["aggressive"],
+            75,
+            start_utc + timedelta(minutes=15),
+        ),
+        # Vehículo liviano (45 L, 9 L/100 km) moderado por la misma ruta
+        SimulatedVehicle(
+            v["VHC-3371-MTO"],
+            r["R04"],
+            DRIVER_PROFILES["moderate"],
+            60,
+            start_utc + timedelta(minutes=22),
+        ),
+        # Agresivo por Av. Ciudad de Cali y Av. Bosa
+        SimulatedVehicle(
+            v["VHC-4826-JKT"],
+            r["R05"],
+            DRIVER_PROFILES["aggressive"],
+            65,
+            start_utc + timedelta(minutes=18),
+        ),
+        # Cumplido por la misma ruta: mismo recorrido, Driver Score opuesto
+        SimulatedVehicle(
+            v["VHC-9053-HRD"],
+            r["R05"],
+            DRIVER_PROFILES["compliant"],
+            80,
+            start_utc + timedelta(minutes=26),
+        ),
+        # Moderado por Av. Boyacá, Calle 80 y Suba
+        SimulatedVehicle(
+            v["VHC-2715-SUB"],
+            r["R06"],
+            DRIVER_PROFILES["moderate"],
+            55,
+            start_utc + timedelta(minutes=20),
         ),
     ]

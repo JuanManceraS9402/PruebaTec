@@ -188,7 +188,10 @@ A igual prioridad gana el límite más bajo; sin geocerca con límite se aplica
 `default_speed_limit_kmh`. Así, un corredor rápido dentro del perímetro urbano puede
 tener un límite **mayor** que el urbano, algo que la regla del mínimo no permite.
 
-**Escenario Bogotá sobre datos reales.** Las tres rutas siguen la red vial real: se
+**Escenario Bogotá sobre datos reales.** Flota de 10 vehículos (3 cumplidos, 4
+moderados, 3 agresivos; uno liviano de 45 L) en 6 rutas. Tres de ellas (R04–R06) se
+trazaron a propósito por los tramos críticos oficiales de Av. Américas, NQS, Av. Ciudad
+de Cali, Av. Bosa y Calle 72. Las rutas siguen la red vial real: se
 calcularon una vez con OSRM sobre OpenStreetMap (`scripts/fetch_osm_routes.py`). Las
 geocercas salen de datos abiertos oficiales (`scripts/fetch_bogota_open_data.py`). Ambos
 resultados se versionan como GeoJSON, así el proyecto no depende de internet y es

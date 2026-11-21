@@ -68,9 +68,9 @@ pip install -e ".[dev,dashboard]"
 python -m simon_geo.seed
 ```
 
-Carga 5 vehículos, 2.257 geocercas reales (perímetro urbano del POT, 2.209 zonas
+Carga 10 vehículos, 2.257 geocercas reales (perímetro urbano del POT, 2.209 zonas
 escolares, 44 tramos y puntos críticos de siniestralidad de la Secretaría de Movilidad,
-corredores de OpenStreetMap y el patio), 3 rutas y la asignación de ruta de cada
+corredores de OpenStreetMap y el patio), 6 rutas y la asignación de ruta de cada
 vehículo. Es idempotente.
 
 Los datos geográficos ya vienen versionados en `src/simon_geo/seed/data/`. Para
