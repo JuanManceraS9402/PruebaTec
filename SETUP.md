@@ -123,10 +123,13 @@ de datos: como *Analista BI* los IDs salen enmascarados (`VHC-****-ABC`), y como
 *Administrador* salen reales. El mapa muestra las rutas del día, el mapa de calor, los
 puntos de infracción, las geocercas y las zonas calientes.
 
-**Mapa base:** CARTO o la **ortofoto urbana 2025** de Bogotá, que se carga en vivo desde
-el servicio de imágenes de Catastro (IDECA). Ejecuta Streamlit desde la raíz del
+**Mapa base:** el interruptor **Ortofoto 2025** (esquina superior izquierda del mapa)
+pone la ortofoto urbana 2025 de Bogotá, cargada en vivo desde el servicio de imágenes de
+Catastro (IDECA), debajo de las vías y los nombres del mapa de CARTO. Fuera de la
+cobertura de la ortofoto se ve el mapa de CARTO. Ejecuta Streamlit desde la raíz del
 repositorio: `.streamlit/config.toml` activa el servidor estático que entrega el estilo
-del mapa (`dashboard/static/`).
+(`dashboard/static/`). El estilo híbrido se genera al arrancar; sin internet queda la
+ortofoto sola.
 
 ## 9. Benchmark (millones de puntos)
 

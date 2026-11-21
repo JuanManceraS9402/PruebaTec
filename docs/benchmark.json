@@ -1,6 +1,6 @@
 {
   "rows": 5040000,
-  "load_s": 0.0,
+  "load_s": 117.17604629999914,
   "environment": {
     "PostgreSQL": "19.0",
     "PostGIS": "3.7.0",
@@ -8,12 +8,12 @@
     "work_mem": "4MB",
     "CPU (cliente)": "12 núcleos lógicos",
     "SO (cliente)": "Windows 10",
-    "Fecha": "2026-11-21 01:07 UTC"
+    "Fecha": "2026-11-21 05:26 UTC"
   },
   "sizes": {
     "Tabla (heap)": 635199488,
     "telemetry_raw_pkey": 350658560,
-    "telemetry_raw_geom_gist": 212008960,
+    "telemetry_raw_geom_gist": 212197376,
     "telemetry_raw_event_brin": 229376,
     "telemetry_raw_ingested_brin": 229376
   },
@@ -21,8 +21,8 @@
   "scenarios": {
     "zone": {
       "Con índices (GiST + BRIN + poda)": {
-        "median_ms": 0.368,
-        "buffers": 274,
+        "median_ms": 0.174,
+        "buffers": 34,
         "partitions_scanned": 1,
         "access_paths": [
           "Index Scan (geofence_code_key)",
@@ -31,8 +31,8 @@
         ]
       },
       "Sin GiST": {
-        "median_ms": 102.793,
-        "buffers": 11079,
+        "median_ms": 97.113,
+        "buffers": 11080,
         "partitions_scanned": 1,
         "access_paths": [
           "Index Scan (geofence_code_key)",
@@ -40,8 +40,8 @@
         ]
       },
       "Sin filtro de tiempo (7 días, sin poda)": {
-        "median_ms": 59.041,
-        "buffers": 1919,
+        "median_ms": 56.029,
+        "buffers": 199,
         "partitions_scanned": 7,
         "access_paths": [
           "Index Scan (geofence_code_key)",
@@ -52,7 +52,7 @@
     },
     "viewport": {
       "Con índices": {
-        "median_ms": 5.087,
+        "median_ms": 4.211,
         "buffers": 328,
         "partitions_scanned": 1,
         "access_paths": [
@@ -62,7 +62,7 @@
         ]
       },
       "Sin GiST": {
-        "median_ms": 7.775,
+        "median_ms": 5.599,
         "buffers": 488,
         "partitions_scanned": 1,
         "access_paths": [
@@ -71,7 +71,7 @@
         ]
       },
       "Sin BRIN": {
-        "median_ms": 9.434,
+        "median_ms": 9.579,
         "buffers": 4555,
         "partitions_scanned": 1,
         "access_paths": [
@@ -83,7 +83,7 @@
     },
     "trace": {
       "Con índices (PK + poda)": {
-        "median_ms": 1.349,
+        "median_ms": 1.028,
         "buffers": 1455,
         "partitions_scanned": 1,
         "access_paths": [
@@ -94,28 +94,38 @@
     },
     "enrichment": {
       "Con índices": {
-        "median_ms": 53.916,
-        "buffers": 30493,
+        "median_ms": 1053.751,
+        "buffers": 141987,
         "partitions_scanned": 1,
         "access_paths": [
           "Bitmap Heap Scan",
           "Bitmap Index Scan (telemetry_raw_event_brin)",
           "Index Scan (geofence_geom_gist)"
         ]
+      },
+      "Sin GiST de geocercas": {
+        "median_ms": 15721.529,
+        "buffers": 7560493,
+        "partitions_scanned": 1,
+        "access_paths": [
+          "Bitmap Heap Scan",
+          "Bitmap Index Scan (telemetry_raw_event_brin)",
+          "Seq Scan"
+        ]
       }
     },
     "heatmap": {
       "Un día (poda a 1 partición)": {
-        "median_ms": 261.968,
-        "buffers": 12529,
+        "median_ms": 361.83,
+        "buffers": 12527,
         "partitions_scanned": 1,
         "access_paths": [
           "Seq Scan"
         ]
       },
       "7 días (sin poda)": {
-        "median_ms": 1443.616,
-        "buffers": 78991,
+        "median_ms": 2740.663,
+        "buffers": 78989,
         "partitions_scanned": 7,
         "access_paths": [
           "Seq Scan"

@@ -9,8 +9,11 @@ vistas ``analytics.*``; el tablero solo muestra lo que la base le devuelve.
 
 from __future__ import annotations
 
+import json
 from datetime import date
+from pathlib import Path
 
+import httpx
 import pandas as pd
 import psycopg
 import pydeck as pdk
@@ -18,6 +21,7 @@ import streamlit as st
 
 from simon_geo.config import DbRole, get_settings
 from simon_geo.dashboard import charts, data
+from simon_geo.dashboard.basemap import POSITRON_STYLE_URL, hybrid_style
 from simon_geo.dashboard.views import (
     HEATMAP_COLORS,
     HOTSPOT_COLOR,
@@ -56,13 +60,23 @@ TOOLTIP = {
     "style": {"fontSize": "13px", "maxWidth": "320px"},
 }
 LOCAL_TZ = "America/Bogota"
-# Mapas base. La ortofoto es un estilo MapLibre servido por la propia app
-# (dashboard/static, ver .streamlit/config.toml) que pide teselas al ImageServer de
-# Catastro/IDECA con exportImage: no hace falta token ni copiar imágenes.
-BASEMAPS = {
-    "Mapa (CARTO)": "light",
-    "Ortofoto 2025 (IDECA)": "/app/static/ortofoto_bogota_2025.json",
+# Mapa base con ortofoto: estilo MapLibre servido por la propia app (dashboard/static,
+# ver .streamlit/config.toml) que pide teselas al ImageServer de Catastro/IDECA.
+STATIC_DIR = Path(__file__).parent / "static"
+HYBRID_STYLE_FILE = "ortofoto_hibrida.json"  # se genera al arrancar (no se versiona)
+ORTHO_ONLY_STYLE_FILE = "ortofoto_bogota_2025.json"  # respaldo sin internet
+MAP_CSS = """
+<style>
+/* Interruptor de mapa base flotando sobre la esquina superior izquierda del mapa */
+[data-testid="stColumn"]:has(.st-key-basemap_switch) { position: relative; }
+.st-key-basemap_switch {
+  position: absolute; top: 10px; left: 10px; z-index: 5; width: auto !important;
+  background: rgba(24, 26, 31, 0.82); border-radius: 8px; padding: 4px 12px 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
+.st-key-basemap_switch p { color: #fff !important; font-weight: 600; }
+</style>
+"""
 
 st.set_page_config(page_title="Simón Geo · Flota", page_icon="🗺️", layout="wide")
 
@@ -82,6 +96,19 @@ def conn_for(role: DbRole) -> psycopg.Connection:
         connection.clear()
         conn = connection(role)
     return conn
+
+
+@st.cache_resource(show_spinner=False)
+def ortho_style_url() -> str:
+    """Genera una vez el estilo híbrido (ortofoto + vías y nombres de CARTO). Sin
+    internet, o si CARTO cambia su estilo, queda la ortofoto sola."""
+    try:
+        base = httpx.get(POSITRON_STYLE_URL, timeout=5).raise_for_status().json()
+        style = hybrid_style(base)
+        (STATIC_DIR / HYBRID_STYLE_FILE).write_text(json.dumps(style), encoding="utf-8")
+    except (httpx.HTTPError, ValueError, KeyError, OSError):
+        return f"/app/static/{ORTHO_ONLY_STYLE_FILE}"
+    return f"/app/static/{HYBRID_STYLE_FILE}"
 
 
 @st.cache_data(ttl=CACHE_TTL_S, show_spinner=False)
@@ -254,21 +281,12 @@ def hotspot_layers(hotspots: pd.DataFrame) -> list[pdk.Layer]:
 
 
 # --------------------------------------------------------------------- UI
-def sidebar() -> tuple[DbRole, dict[str, bool], str]:
+def sidebar() -> tuple[DbRole, dict[str, bool]]:
     st.sidebar.title("Simón Geo")
     role = ROLES[st.sidebar.radio("Ver como", list(ROLES))]
     st.sidebar.caption(
         "El mismo tablero, dos usuarios de base de datos. El enmascaramiento ocurre en "
         "PostgreSQL (vistas `analytics.*`), no aquí."
-    )
-    st.sidebar.subheader("Mapa base")
-    basemap = st.sidebar.radio(
-        "Mapa base",
-        list(BASEMAPS),
-        horizontal=True,
-        label_visibility="collapsed",
-        help="La ortofoto urbana 2025 se carga en vivo desde el servicio de imágenes de "
-        "Catastro Bogotá (IDECA); se ve a partir de zoom 10.",
     )
     st.sidebar.subheader("Capas")
     layers = {
@@ -290,7 +308,7 @@ def sidebar() -> tuple[DbRole, dict[str, bool], str]:
             "menor Driver Score).",
         ),
     }
-    return role, layers, BASEMAPS[basemap]
+    return role, layers
 
 
 def render_kpis(kpis: pd.DataFrame, alerts: pd.DataFrame) -> None:
@@ -306,7 +324,7 @@ def render_kpis(kpis: pd.DataFrame, alerts: pd.DataFrame) -> None:
 
 
 def main() -> None:
-    role, enabled, map_style = sidebar()
+    role, enabled = sidebar()
     try:
         days = load_days(role)
         geofences, hotspots, (db_user, is_admin) = load_static(role)
@@ -398,6 +416,14 @@ def main() -> None:
     view = view_for((t["path"] for t in tracks), map_alerts)
     map_col, legend_col = st.columns([4, 1])
     with map_col:
+        st.html(MAP_CSS)
+        with st.container(key="basemap_switch"):
+            ortho = st.toggle(
+                "Ortofoto 2025",
+                help="Ortofoto urbana 2025 de Bogotá (Catastro / IDECA) bajo las vías y los "
+                "nombres del mapa; se ve a partir de zoom 10.",
+            )
+        map_style = ortho_style_url() if ortho else "light"
         st.pydeck_chart(
             pdk.Deck(
                 layers=layers,
