@@ -24,3 +24,6 @@ data/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Notas personales
+GUION_VIDEO.md
