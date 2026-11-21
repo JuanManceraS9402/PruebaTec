@@ -1,0 +1,126 @@
+{
+  "rows": 5040000,
+  "load_s": 0.0,
+  "environment": {
+    "PostgreSQL": "19.0",
+    "PostGIS": "3.7.0",
+    "shared_buffers": "128MB",
+    "work_mem": "4MB",
+    "CPU (cliente)": "12 núcleos lógicos",
+    "SO (cliente)": "Windows 10",
+    "Fecha": "2026-11-21 01:07 UTC"
+  },
+  "sizes": {
+    "Tabla (heap)": 635199488,
+    "telemetry_raw_pkey": 350658560,
+    "telemetry_raw_geom_gist": 212008960,
+    "telemetry_raw_event_brin": 229376,
+    "telemetry_raw_ingested_brin": 229376
+  },
+  "btree_equivalent_bytes": 36986880,
+  "scenarios": {
+    "zone": {
+      "Con índices (GiST + BRIN + poda)": {
+        "median_ms": 0.368,
+        "buffers": 274,
+        "partitions_scanned": 1,
+        "access_paths": [
+          "Index Scan (geofence_code_key)",
+          "Bitmap Heap Scan",
+          "Bitmap Index Scan (telemetry_raw_geom_gist)"
+        ]
+      },
+      "Sin GiST": {
+        "median_ms": 102.793,
+        "buffers": 11079,
+        "partitions_scanned": 1,
+        "access_paths": [
+          "Index Scan (geofence_code_key)",
+          "Seq Scan"
+        ]
+      },
+      "Sin filtro de tiempo (7 días, sin poda)": {
+        "median_ms": 59.041,
+        "buffers": 1919,
+        "partitions_scanned": 7,
+        "access_paths": [
+          "Index Scan (geofence_code_key)",
+          "Bitmap Heap Scan",
+          "Bitmap Index Scan (telemetry_raw_geom_gist)"
+        ]
+      }
+    },
+    "viewport": {
+      "Con índices": {
+        "median_ms": 5.087,
+        "buffers": 328,
+        "partitions_scanned": 1,
+        "access_paths": [
+          "Bitmap Heap Scan",
+          "Bitmap Index Scan (telemetry_raw_event_brin)",
+          "Bitmap Index Scan (telemetry_raw_geom_gist)"
+        ]
+      },
+      "Sin GiST": {
+        "median_ms": 7.775,
+        "buffers": 488,
+        "partitions_scanned": 1,
+        "access_paths": [
+          "Bitmap Heap Scan",
+          "Bitmap Index Scan (telemetry_raw_event_brin)"
+        ]
+      },
+      "Sin BRIN": {
+        "median_ms": 9.434,
+        "buffers": 4555,
+        "partitions_scanned": 1,
+        "access_paths": [
+          "Bitmap Heap Scan",
+          "Bitmap Index Scan (telemetry_raw_geom_gist)",
+          "Bitmap Index Scan (telemetry_raw_pkey)"
+        ]
+      }
+    },
+    "trace": {
+      "Con índices (PK + poda)": {
+        "median_ms": 1.349,
+        "buffers": 1455,
+        "partitions_scanned": 1,
+        "access_paths": [
+          "Bitmap Heap Scan",
+          "Bitmap Index Scan (telemetry_raw_pkey)"
+        ]
+      }
+    },
+    "enrichment": {
+      "Con índices": {
+        "median_ms": 53.916,
+        "buffers": 30493,
+        "partitions_scanned": 1,
+        "access_paths": [
+          "Bitmap Heap Scan",
+          "Bitmap Index Scan (telemetry_raw_event_brin)",
+          "Index Scan (geofence_geom_gist)"
+        ]
+      }
+    },
+    "heatmap": {
+      "Un día (poda a 1 partición)": {
+        "median_ms": 261.968,
+        "buffers": 12529,
+        "partitions_scanned": 1,
+        "access_paths": [
+          "Seq Scan"
+        ]
+      },
+      "7 días (sin poda)": {
+        "median_ms": 1443.616,
+        "buffers": 78991,
+        "partitions_scanned": 7,
+        "access_paths": [
+          "Seq Scan"
+        ]
+      }
+    }
+  }
+}

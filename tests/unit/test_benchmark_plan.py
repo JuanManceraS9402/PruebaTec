@@ -71,6 +71,13 @@ class TestSummarize:
             "Seq Scan",
         )
 
+    def test_access_paths_use_given_parent_names(self) -> None:
+        s = summarize(
+            PRUNED_BITMAP,
+            index_names={"telemetry_raw_p20260920_geom_idx": "telemetry_raw_geom_gist"},
+        )
+        assert "Bitmap Index Scan (telemetry_raw_geom_gist)" in s.access_paths
+
     def test_rejects_non_analyze_output(self) -> None:
         with pytest.raises(ValueError):
             summarize([{"Query": "x"}])

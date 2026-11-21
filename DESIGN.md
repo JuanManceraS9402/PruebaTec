@@ -303,8 +303,41 @@ adición para agregaciones (ver §8), no un reemplazo.
 sola vez** en Plata y se guarda como arreglo. Las consultas de BI ("cuánto tiempo pasó la
 flota en zonas escolares") se responden con el índice GIN sin volver a tocar geometrías.
 
-Los resultados medidos de `EXPLAIN (ANALYZE, BUFFERS)` con millones de filas están en
-[docs/benchmark.md](docs/benchmark.md).
+### Resultados medidos
+
+Con **5.040.000 puntos** (500 vehículos × 7 días, un reporte por minuto) en una tabla con la
+misma definición e índices que Bronce. Se usó PostgreSQL 19 + PostGIS 3.7 con la
+configuración **por defecto** (`shared_buffers` 128 MB, `work_mem` 4 MB); el detalle y los
+planes completos están en [docs/benchmark.md](docs/benchmark.md).
+
+| Consulta | Con la estrategia de índices | Sin ella | Qué demuestra |
+|---|---:|---:|---|
+| Puntos dentro de la zona escolar en un día | **0,4 ms** (274 páginas) | 103 ms sin GiST (11.079 páginas, *Seq Scan*) | GiST: ~250× más rápido y 40× menos E/S |
+| La misma consulta sin filtro de tiempo | 0,4 ms (1 partición) | 59 ms (7 particiones) | Poda de particiones: solo se toca el día pedido |
+| Viewport del mapa en una hora | **5 ms** | 9 ms sin BRIN (4.555 páginas) | PostgreSQL **combina** BRIN (tiempo) y GiST (espacio) en un *BitmapAnd* |
+| Traza de un vehículo en un día | **1,3 ms** | — | La PK `(vehicle_id, event_ts)` sirve también como índice de consulta |
+| Geocercas de una hora (consulta del worker, ~30.000 puntos) | **54 ms** | — | ~560.000 puntos/s de punto-en-polígono, usando `geofence_geom_gist` |
+| Malla de calor de excesos, un día | **262 ms** | 1,4 s para 7 días | Agregación sin índice útil; la poda acota el trabajo a un día |
+
+| Índice | Tamaño (5 M filas) |
+|---|---:|
+| BRIN sobre `event_ts` | **224 KB** |
+| B-tree equivalente sobre `event_ts` | 35,3 MB (**~160×** más grande) |
+| GiST sobre `geom` | 202 MB |
+| Tabla | 606 MB |
+
+Lectura honesta de los números:
+
+* El índice que más cambia el resultado es el **GiST** en consultas por polígono; el BRIN
+  y la poda reducen el volumen a un día o a una hora antes de que el GiST trabaje.
+* En el viewport de una hora el GiST aporta poco (5 → 8 ms), porque el BRIN ya dejó solo
+  ~30.000 candidatos. Los índices se complementan; ninguno basta solo para todo.
+* La carga fue de **~44.000 filas/s** con todos los índices activos y en una sola sesión.
+  El costo dominante es mantener el GiST y la PK. Para más volumen, el camino es cargar
+  con `COPY` y en varias sesiones en paralelo (por ejemplo, una por partición); no se midió
+  en esta prueba.
+* La malla de calor de Oro no se calcula al consultar: es una vista materializada, de modo
+  que el tablero lee el resultado ya agregado.
 
 ---
 

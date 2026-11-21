@@ -56,13 +56,17 @@ def _strip_partition_suffix(index_name: str) -> str:
 
 
 def summarize(
-    explain_json: Sequence[Mapping[str, Any]], partitioned_table: str | None = None
+    explain_json: Sequence[Mapping[str, Any]],
+    partitioned_table: str | None = None,
+    index_names: Mapping[str, str] | None = None,
 ) -> PlanSummary:
     """Resume la salida de ``EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)``.
 
     ``partitioned_table``: nombre (sin esquema) de la tabla particionada; solo sus
     particiones (``<tabla>_p…`` / ``<tabla>_default``) cuentan como escaneadas.
+    ``index_names``: índice de partición → índice padre (nombre legible en el informe).
     """
+    aliases = index_names or {}
     if not explain_json or "Plan" not in explain_json[0]:
         raise ValueError("Se esperaba la salida JSON de EXPLAIN (ANALYZE, ...)")
     top = explain_json[0]
@@ -81,7 +85,8 @@ def summarize(
             relations.add(f"{node.get('Schema', '')}.{relation}")
         label = node_type
         if "Index Name" in node:
-            label += f" ({_strip_partition_suffix(node['Index Name'])})"
+            name = node["Index Name"]
+            label += f" ({aliases.get(name) or _strip_partition_suffix(name)})"
         if label not in paths:
             paths.append(label)
 

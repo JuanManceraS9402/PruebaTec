@@ -260,27 +260,51 @@ def load_data(conn: psycopg.Connection, cfg: BenchmarkConfig, log: Callable[[str
 
 
 # ------------------------------------------------------------------- medición
+def partition_index_names(conn: psycopg.Connection) -> dict[str, str]:
+    """Índice de cada partición → índice declarado en la tabla padre."""
+    rows = conn.execute(
+        """
+        SELECT child.relname, parent.relname
+        FROM pg_index pi
+        JOIN pg_class parent ON parent.oid = pi.indexrelid
+        CROSS JOIN LATERAL pg_partition_tree(pi.indexrelid) t
+        JOIN pg_class child ON child.oid = t.relid
+        WHERE pi.indrelid = %s::regclass AND t.isleaf
+        """,
+        (QUALIFIED,),
+    ).fetchall()
+    return dict(rows)
+
+
 def explain(
-    conn: psycopg.Connection, query: str, repetitions: int
+    conn: psycopg.Connection,
+    query: str,
+    repetitions: int,
+    index_names: dict[str, str] | None = None,
 ) -> tuple[float, PlanSummary, str]:
     summaries = []
     for _ in range(repetitions):
         raw = conn.execute(f"EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {query}").fetchone()[0]
         plan = raw if isinstance(raw, list) else json.loads(raw)
-        summaries.append(summarize(plan, partitioned_table=TABLE))
+        summaries.append(summarize(plan, partitioned_table=TABLE, index_names=index_names))
     text = "\n".join(
         r[0] for r in conn.execute(f"EXPLAIN (ANALYZE, BUFFERS, COSTS OFF, TIMING OFF) {query}")
     )
     return median_ms(summaries), summaries[-1], text
 
 
-def run_variant(conn: psycopg.Connection, variant: Variant, repetitions: int) -> VariantResult:
+def run_variant(
+    conn: psycopg.Connection,
+    variant: Variant,
+    repetitions: int,
+    index_names: dict[str, str] | None = None,
+) -> VariantResult:
     with conn.transaction(force_rollback=True):
         if variant.drop_index:
             conn.execute(f"DROP INDEX {variant.drop_index}")
         # Una lectura previa calienta la caché: se mide el plan, no el disco frío.
         conn.execute(variant.query).fetchall()
-        ms, summary, text = explain(conn, variant.query, repetitions)
+        ms, summary, text = explain(conn, variant.query, repetitions, index_names)
     return VariantResult(variant, ms, summary, text)
 
 
@@ -356,10 +380,13 @@ def run(
         load_s = load_data(conn, cfg, log)
     rows = conn.execute(f"SELECT count(*) FROM {QUALIFIED}").fetchone()[0]
 
+    index_names = partition_index_names(conn)
     results: list[tuple[Scenario, list[VariantResult]]] = []
     for scenario in scenarios(cfg):
         log(f"Midiendo: {scenario.title}")
-        variant_results = [run_variant(conn, v, cfg.repetitions) for v in scenario.variants]
+        variant_results = [
+            run_variant(conn, v, cfg.repetitions, index_names) for v in scenario.variants
+        ]
         for vr in variant_results:
             log(f"  {vr.variant.name}: {vr.median_ms:.1f} ms")
         results.append((scenario, variant_results))
