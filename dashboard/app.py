@@ -520,4 +520,54 @@ def main() -> None:
         )
 
 
+DATOS_ABIERTOS = "https://datosabiertos.bogota.gov.co/dataset"
+# (capa, fuente, enlace, licencia)
+CREDITS = (
+    (
+        "Rutas y corredores",
+        "© colaboradores de OpenStreetMap; rutas calculadas con OSRM",
+        "https://www.openstreetmap.org/copyright",
+        "ODbL",
+    ),
+    (
+        "Perímetro urbano (POT)",
+        "Secretaría Distrital de Planeación",
+        f"{DATOS_ABIERTOS}/perimetro-urbano-bogota-d-c",
+        "CC BY 4.0",
+    ),
+    (
+        "Zonas escolares (100 m por sede)",
+        "Colegios Bogotá D.C. 12/2025, Secretaría de Educación del Distrito",
+        f"{DATOS_ABIERTOS}/colegios-bogota-d-c",
+        "CC BY-SA 4.0",
+    ),
+    (
+        "Tramos y puntos críticos de siniestralidad 2022–2025",
+        "Oficina de Seguridad Vial, Secretaría Distrital de Movilidad",
+        "https://sig.simur.gov.co/arcgis/rest/services/DatosAbiertos",
+        "CC BY 4.0",
+    ),
+    (
+        "Ortofoto urbana 2025",
+        "Secretaría Distrital de Planeación, publicada por IDECA – UAECD",
+        "https://serviciosgis.catastrobogota.gov.co/image/rest/services/"
+        "imagenesfunciones/orthourbana2025funcion/ImageServer",
+        "Servicio público de IDECA",
+    ),
+    ("Mapa base", "© CARTO, © OpenStreetMap", "https://carto.com/attributions", "—"),
+)
+
+
+def render_credits() -> None:
+    st.divider()
+    with st.expander("Fuentes de datos y licencias", icon=":material/info:"):
+        rows = [
+            f"| {layer} | [{source}]({url}) | {license_} |"
+            for layer, source, url, license_ in CREDITS
+        ]
+        st.markdown("\n".join(["| Capa | Fuente | Licencia |", "|---|---|---|", *rows]))
+        st.caption("La flota, la telemetría y el patio logístico son simulados.")
+
+
 main()
+render_credits()

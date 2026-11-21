@@ -1,159 +1,105 @@
 # PROGRESO · Estado del trabajo y cómo continuar
 
-> Notas de traspaso para seguir en otro PC. Se pueden borrar antes de la entrega final,
-> o dejarlas como bitácora.
+> Bitácora de traspaso. **Borrarla del repo antes de la entrega** (son notas internas).
+> Última actualización: 2026-11-21.
 
 ## 1. Contexto
 
-- **Prueba técnica:** Ingeniero GIS / Desarrollador de Datos Espaciales (Simón Movilidad, BI).
-- **Objetivo:** un pipeline geoespacial **Bronce → Plata → Oro** para telemetría AVL de flota. Incluye:
+- **Prueba técnica:** Ingeniero GIS / Desarrollador de Datos Espaciales (Simón Movilidad).
+- **Pide:** pipeline Bronce → Plata → Oro en PostgreSQL + PostGIS:
   - ingesta con enmascaramiento `VHC-****-ABC`;
   - geocercas;
-  - alertas de velocidad según la zona;
-  - alerta predictiva de combustible;
-  - capa Oro con índices GiST;
+  - alertas de velocidad por zona y alerta predictiva de combustible;
+  - capa Oro con GiST;
   - dashboard opcional.
 - **Entregables:** repo público, tests, `DESIGN.md`, `SETUP.md` y un video de 5 minutos como máximo.
-- **Pesos de la evaluación:** código 30 %, funcionalidad espacial 25 %, Big Data/SQL 20 %, documentación 15 %, testing 10 %.
-- **Escenario:** Bogotá.
-  - **Límite general de 50 km/h**, que incluye autopistas y vías principales.
-  - **30 km/h** en zonas escolares.
-  - **20 km/h** en el patio, como política interna de la empresa (está documentado así).
+- **Repo:** <https://github.com/JuanManceraS9402/PruebaTec> (rama `main`). La CI está en verde.
 
-## 2. Restricciones del PC anterior
+## 2. Estado: todo el código está hecho
 
-> **PC nuevo (2026-11-20):** tampoco tiene Docker (el usuario lo está instalando).
-> **La CI ya pasó en verde, incluida la integración**: el SQL de `db/init` funciona en PostGIS real. El repo ya está en GitHub
-> (`JuanManceraS9402/PruebaTec`) y la CI es la que ejecuta el SQL contra PostGIS.
+| Bloque | Estado |
+|---|---|
+| Esquema SQL (`db/init/00–07`) | Particiones diarias, GiST + BRIN, Plata, Oro (KPIs, Driver Score, malla 250 m, **zonas calientes DBSCAN**), seguridad por rol |
+| API FastAPI | Ingesta idempotente por lotes, alertas enmascaradas por rol |
+| Worker incremental | Watermark por `ingested_at`, lookback de 2 h, refresco de Oro |
+| Simulador | **10 vehículos, 6 rutas reales (OSRM)**, perfiles cumplido/moderado/agresivo, ruido, duplicados y outliers |
+| Geocercas | **2.257 reales** de datos abiertos (ver §4) |
+| Benchmark | 5,04 M de puntos, `docs/benchmark.md` actualizado con las geocercas reales |
+| Tablero Streamlit | Mapa (capas, leyenda, ortofoto IDECA híbrida), BI interactivo (ranking clicable, perfil del vehículo, infracciones por zona y en el tiempo), créditos al pie |
+| Docs | `README.md`, `DESIGN.md`, `SETUP.md` y `docs/benchmark.md` al día, con fuentes y licencias |
+| Pruebas | 201 unitarias y 44 de integración. La CI corre las dos contra PostGIS real |
 
-- No se podía instalar nada: **no había Docker ni PostgreSQL**. Por eso **el SQL nunca se ha ejecutado**.
-  - Solo se validó la sintaxis con `pglast`.
-  - La ejecución real la hará la CI de GitHub Actions.
-- **No se hizo ningún commit.** La identidad git de ese PC era de otra persona.
+## 3. Cómo levantar todo (este PC, sin Docker)
 
-## 3. Primeros pasos en el PC nuevo
+PostgreSQL 19 + PostGIS 3.7 nativo en el **puerto 5433**. La contraseña está en `.env`, que no se versiona.
 
-```bash
-# 1. Copiar la carpeta SIN .venv/ y entrar en ella
-python -m venv .venv
-.venv\Scripts\activate            # Linux/macOS: source .venv/bin/activate
-pip install -e ".[dev,dashboard]"
-
-# 2. Verificar que todo sigue verde
-ruff check . && ruff format --check .
-pytest -m "not integration"       # esperado: 161 passed
-
-# 3. Git con tu identidad (local al repo)
-git init -b main
-git config user.name "Tu Nombre"
-git config user.email "tu-correo-de-github"
-git add -A
-git commit -m "Pipeline geoespacial Bronce/Plata/Oro: esquema PostGIS, reglas, API y CI"
-
-# 4. Crear el repo público en GitHub y subir
-git remote add origin https://github.com/<usuario>/<repo>.git
-git push -u origin main
+```powershell
+cd E:\Usuario\Documentos\Movilidad
+.venv\Scripts\activate
+python -m simon_geo.bootstrap --reset          # base limpia
+python -m simon_geo.seed                       # 10 vehículos, 2.257 geocercas, 6 rutas
+uvicorn simon_geo.api.app:app                  # otra terminal
+python -m simon_geo.simulator --out data/telemetry.jsonl --api-url http://localhost:8000
+python -m simon_geo.processing --settle-s 0
+streamlit run dashboard/app.py                 # DESDE LA RAÍZ (lee .streamlit/config.toml)
 ```
 
-Si el PC nuevo tiene Docker, conviene ejecutar el flujo de `SETUP.md`:
+- **Pruebas de integración:** necesitan una base limpia (`bootstrap --reset` + `seed`). Con los datos de la demo cargados falla la prueba de geocercas PostGIS = Python, y es lo esperado.
+- **Después de correrlas:** regenerar la demo.
+- **Simulador:** usa la última jornada ya terminada (hoy o ayer a las 06:00), porque la API rechaza fechas futuras.
 
-```bash
-docker compose up -d --wait
-python -m simon_geo.seed
-REQUIRE_DB=1 pytest -m integration -v
-```
+## 4. Datos reales y referencias
 
-**Es la primera vez que el SQL va a correr de verdad. Es probable que algo falle.** Los puntos de riesgo:
-
-- `REFRESH MATERIALIZED VIEW CONCURRENTLY` dentro de `gold.refresh_all` (plpgsql).
-- Los `GRANT` sobre vistas de `analytics` y las funciones SECURITY DEFINER.
-- `07_users.sh` necesita finales de línea LF. `.gitattributes` ya lo fuerza.
-- La inserción de EPSG:9377 en `spatial_ref_sys`, si la imagen ya la trae.
-
-## 4. Lo que está hecho
-
-### Base de datos (`db/init/`, se ejecuta en orden al crear el volumen)
-
-| Archivo | Contenido |
-|---|---|
-| `00_extensions.sql` | PostGIS, `pg_stat_statements`, zona horaria UTC, EPSG:9377 (MAGNA-SIRGAS Origen-Nacional) |
-| `01_schemas_ops.sql` | Esquemas `ref/bronze/silver/gold/analytics/security/ops`, tabla `ops.parameter` (parámetros de negocio), `ops.watermark`, función `ops.ensure_daily_partitions()` |
-| `02_reference.sql` | `ref.vehicle`, `ref.geofence` (MultiPolygon, prioridad por tipo, GiST WHERE active), `ref.route`, `ref.vehicle_route_assignment` |
-| `03_bronze.sql` | `bronze.telemetry_raw`: particionada por día, PK `(vehicle_id, event_ts)` para idempotencia, `geom` generada, índices GiST y BRIN, partición DEFAULT |
-| `04_silver.sql` | `silver.telemetry_enriched` (columnas iguales a `EnrichedPoint`) y `silver.alert` con UNIQUE `(vehicle_id, event_ts, alert_type)` |
-| `05_gold.sql` | Función `gold.driver_score()`. MVs `vehicle_daily_kpi`, `infraction_point` e `infraction_grid_250m` (celdas en EPSG:9377). `gold.refresh_all()` |
-| `06_security.sql` | Roles `telemetry_ingest`, `pipeline_worker`, `bi_analyst`, `fleet_admin`. `mask_vehicle_id`, seudónimo `VK-…` con sal (SHA-256). Vistas `analytics.*` con `security_barrier` |
-| `07_users.sh` | Usuarios de login `api_ingest`, `etl_worker`, `analyst_demo`, `admin_demo` |
-
-### Python (`src/simon_geo/`)
-
-| Módulo | Contenido |
-|---|---|
-| `config.py`, `db.py` | Settings (pydantic-settings, `.env`), `DbRole`, `connect()`, `PoolRegistry` (un pool por rol) |
-| `parameters.py` | `PipelineParameters`: espejo de `ops.parameter`. Un test verifica que coinciden |
-| `domain.py` | Vehicle, Geofence, TelemetryPoint, Alert, ZoneType, Severity |
-| `spatial/` | `crs.py` (EPSG:9377), `distance.py` (haversine), `geofencing.py` (STRtree con prioridad SCHOOL > RESTRICTED > HIGH_RISK > DEPOT > HIGHWAY > URBAN; a igual prioridad gana el límite menor), `routes.py` (progreso y km restantes de la ruta) |
-| `rules/` | `speed.py` (tolerancia de 3 km/h; severidad que escala en zonas SCHOOL y HIGH_RISK), `kinematics.py`, `fuel.py` (regresión del consumo sobre 30 km, detección de recarga, autonomía y riesgo), `track.py` (TrackProcessor: outliers GPS por encima de 200 km/h, alertas por episodio) |
-| `processing/` | `enrichment.py` (SilverEnricher), `queries.py` (`BRONZE_POINTS_WITH_GEOFENCES`: LATERAL con `ST_Intersects` y GiST) |
-| `reference.py` | `upsert_reference()` y `load_reference()` contra la BD |
-| `seed/` | `bogota.py` (3 rutas, 6 geocercas, 5 vehículos, cada uno prueba una regla) y `python -m simon_geo.seed` |
-| `simulator/` | Flota simulada con perfiles de conductor, ruido, duplicados y outliers. CLI con `--out` y `--api-url` |
-| `api/` | FastAPI con `POST /v1/telemetry` (lotes, idempotente, rechazo por paquete), `GET /v1/alerts` (enmascarado según rol) y `GET /health`. Roles por `X-API-Key` |
-
-### Tests y CI
-
-- `tests/unit/`: **122 tests que pasan** sin BD (reglas, geocercas, combustible, track, API y simulación completa).
-- `tests/integration/`: 29 tests que requieren PostGIS. Sin BD se saltan, y con `REQUIRE_DB=1` fallan en su lugar. Cubren:
-  - esquema, EPSG:9377 y parámetros;
-  - particiones;
-  - permisos y enmascaramiento;
-  - ingesta idempotente;
-  - **geocercas de PostGIS idénticas a las de Python**.
-- `.github/workflows/ci.yml`: el job `unit` corre ruff y pytest; el job `integration` hace `docker compose up --wait`, carga el seed y corre `pytest -m integration`.
-
-### Documentación
-
-- `SETUP.md`: completo.
-- `README.md`: inicial. **Hay que actualizarlo**, porque no menciona la API, `processing/`, la CI ni el simulador.
-
-### Resultados del escenario Bogotá (en memoria)
-
-| Vehículo | Caso | Resultado |
+| Capa | Fuente | Licencia |
 |---|---|---|
-| VHC-8472-ABC | Conductor cumplido, ruta R01 | 0 alertas, 0 eventos bruscos. Consumo estimado 31.9 L/100 km (real 32) |
-| VHC-1935-BOG | Agresivo, ruta R02 | Alertas HIGH y CRITICAL en BOG-AUTOSUR |
-| VHC-5521-KLM | Moderado, ruta R03 | Alerta MEDIUM en la zona escolar de Teusaquillo |
-| VHC-7310-TRZ | Combustible al 3.5 %, ruta R02 | Alerta CRITICAL de combustible. Se queda sin gasolina en el km 13.9 de 15.4 |
-| VHC-2048-QWE | Recarga en el km 6, ruta R01 | Recarga detectada y ventana de consumo reiniciada |
+| Rutas R01–R06 y corredores | OpenStreetMap vía OSRM (`scripts/fetch_osm_routes.py`) | ODbL |
+| Perímetro urbano (POT) | Secretaría Distrital de Planeación, datosabiertos.bogota.gov.co | CC BY 4.0 |
+| 2.209 zonas escolares (100 m por sede) | Colegios Bogotá D.C. 12/2025, Secretaría de Educación | CC BY-SA 4.0 |
+| 44 tramos y puntos críticos de siniestralidad 2022–2025 | Oficina de Seguridad Vial, Secretaría de Movilidad (sig.simur.gov.co) | CC BY 4.0 |
+| Ortofoto urbana 2025 | SDP, publicada por IDECA – UAECD (ImageServer `orthourbana2025funcion`) | Servicio público |
+| Mapa base | CARTO Positron (vectorial, sin clave) | — |
 
-## 5. Pendiente, en orden de prioridad
+- **Scripts de datos:** `scripts/fetch_bogota_open_data.py` y `scripts/fetch_osm_routes.py --only R04,...`. Los GeoJSON resultantes están versionados en `src/simon_geo/seed/data/`.
+- **Dónde están las referencias:** en el README (tabla "Datos y créditos"), en `DESIGN.md` §3 y en el tablero (desplegable "Fuentes de datos y licencias" al pie).
+- **Lo que no se usó:**
+  - el histórico de siniestros, porque dejó de ser público;
+  - las "zonas críticas en vías locales", porque son áreas enormes;
+  - la ortofoto de dron 2024, porque cubre solo 941 ha.
 
-1. ~~Worker Bronce → Plata → Oro~~ **HECHO** (2026-11-20). `processing/worker.py` y `python -m simon_geo.processing`:
-   - watermark por `ingested_at` con `FOR UPDATE`; lookback de 2 h para continuar el estado de la traza; escribe desde el primer `event_ts` nuevo (upsert de puntos, borrado y reinserción de alertas del rango, para corregir con datos tardíos); refresco de Oro en transacción aparte.
-   - 11 tests unitarios (`tests/unit/test_worker.py`) y 7 de integración (`tests/integration/test_worker.py`). **Los de integración aún no se han ejecutado** (no hay Docker en este PC; los correrá la CI).
-2. **Benchmark Big Data**: código HECHO y validado en CI (`python -m simon_geo.benchmark`). **Falta ejecutarlo a escala (5 M) con Docker local y commitear `docs/benchmark.md`**; luego revisar que DESIGN.md §6 cuadre con los números. Plan original:
-   - generador masivo (millones de filas) que cargue con `COPY`;
-   - `EXPLAIN (ANALYZE, BUFFERS)` de consultas típicas (puntos en geocerca, ventana temporal y vehículo, heatmap), comparando sin y con índices GiST/BRIN y la poda de particiones;
-   - guardar los resultados en `docs/benchmark.md`.
-3. ~~DESIGN.md~~ **HECHO** (2026-11-20; falta enlazar números reales de `docs/benchmark.md`). Era: arquitectura de capas, modelo de datos, decisiones y trade-offs. Temas a cubrir:
-   - por qué se particiona por día;
-   - por qué EPSG:9377;
-   - Python y PostGIS para las geocercas;
-   - enmascaramiento en la BD y no en la API;
-   - idempotencia;
-   - el modelo de combustible;
-   - cómo escalaría (Kafka, Timescale/Citus, etc.).
-4. ~~Dashboard Streamlit~~ **HECHO** (falta verlo en vivo con datos). (`dashboard/app.py`): ruta del vehículo, heatmap de infracciones (`gold.infraction_grid_250m`), KPIs y Driver Score. Debe conectarse como `analyst_demo` para mostrar el enmascaramiento.
-5. **README.md** actualizado con el diagrama, la estructura y los enlaces.
-6. **Guion del video** de 5 minutos: arquitectura, demo de ingesta, demo de enmascaramiento con analista y con admin, geocercas, alertas, EXPLAIN y dashboard.
+## 5. Números clave (para el video)
 
-**Pregunta abierta:** el límite del patio (BOG-PATIO-FONTIBON) está en 20 km/h como política interna. Falta decidir si se deja así o se cambia a 30.
+- **Driver Score:** los cumplidos sacan 100; los moderados, de 44 a 71; los agresivos, de 1,3 a 9,6.
+- **Alertas:** 127 en total, 13 en tramos críticos y 67 en zonas escolares.
+- **Benchmark (5,04 M de puntos):**
 
-## 6. Decisiones clave (para no re-discutirlas)
+  | Medida | Con índice | Sin índice |
+  |---|---|---|
+  | Zona escolar en un día (GiST de puntos) | 0,2 ms | 97 ms |
+  | Enriquecimiento de una hora (GiST de geocercas) | 1,05 s | 15,7 s |
+  | Tamaño del índice de tiempo | BRIN: 224 KB | B-tree: 35 MB |
 
-- `ST_Intersects`: un punto sobre el borde cuenta como dentro de la geocerca. Python usa la misma semántica.
-- La regla de velocidad se resuelve por **prioridad de zona** y no por "límite mínimo global".
-- El enmascaramiento ocurre **en PostgreSQL**, mediante vistas `analytics.*` y `security.is_admin()`. La API solo elige el usuario de BD según la API key.
-- Las alertas se emiten **una por episodio**, más otra si escala la severidad. No se emite una por punto.
-- Se usan tiempos en UTC. Solo los KPI diarios se agrupan por día local en `America/Bogota`.
-- En `api/app.py` **no** se usa `from __future__ import annotations`, porque rompe las dependencias de FastAPI creadas en closures (todas devolvían 422).
+- **Contraste para la demo:** VHC-6194-PLM (agresivo por Américas y NQS) frente a VHC-9053-HRD (cumplido, 100).
+
+## 6. Pendiente para entregar
+
+1. **Grabar el video** siguiendo `GUION_VIDEO.md`. Es local y está en `.gitignore`; tiene la sección de capas y una tabla de referencia rápida.
+2. **Subir el video** como no listado y poner el enlace en el README.
+3. **Borrar este `PROGRESO.md`** del repo.
+4. **Opcional:** zonas calientes con 5 excesos mínimos en vez de 3. Con 127 alertas hay 17 zonas; quedarían unas 9.
+
+## 7. Decisiones clave (para no re-discutirlas)
+
+**Geocercas y velocidad**
+- Se usa `ST_Intersects`: un punto en el borde cuenta como dentro. Python usa la misma semántica.
+- El límite se resuelve por **prioridad de zona** (escolar > restringida > siniestralidad > patio > corredor > urbano), no por el mínimo global.
+- En zonas escolares y de alta siniestralidad la severidad sube un nivel.
+- Se emite **una alerta por episodio**, más otra si la severidad escala.
+- Límites: 50 km/h en la ciudad, incluidas autopistas (Ley 2251 de 2022); 30 km/h en zona escolar; 20 km/h en el patio, como política interna; 80 km/h fuera del perímetro.
+
+**Datos y privacidad**
+- El enmascaramiento se hace **en PostgreSQL** (vistas `analytics.*`), no en la API ni en el tablero.
+- Los tiempos se guardan en UTC. Los KPI diarios se agrupan por día local `America/Bogota`.
+
+**Detalles técnicos que causaron errores**
+- En pydeck, todo texto se trata como expresión. Las unidades van con `pdk.types.String("pixels")`; un campo llamado `width` choca con el ancho del lienzo.
+- En `api/app.py` **no** se usa `from __future__ import annotations`, porque rompe las dependencias de FastAPI.
