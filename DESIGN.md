@@ -338,12 +338,12 @@ planes completos están en [docs/benchmark.md](docs/benchmark.md).
 
 | Consulta | Con la estrategia de índices | Sin ella | Qué demuestra |
 |---|---:|---:|---|
-| Puntos dentro de la zona escolar en un día | **0,4 ms** (274 páginas) | 103 ms sin GiST (11.079 páginas, *Seq Scan*) | GiST: ~250× más rápido y 40× menos E/S |
-| La misma consulta sin filtro de tiempo | 0,4 ms (1 partición) | 59 ms (7 particiones) | Poda de particiones: solo se toca el día pedido |
-| Viewport del mapa en una hora | **5 ms** | 9 ms sin BRIN (4.555 páginas) | PostgreSQL **combina** BRIN (tiempo) y GiST (espacio) en un *BitmapAnd* |
-| Traza de un vehículo en un día | **1,3 ms** | — | La PK `(vehicle_id, event_ts)` sirve también como índice de consulta |
-| Geocercas de una hora (consulta del worker, ~30.000 puntos) | **54 ms** | — | ~560.000 puntos/s de punto-en-polígono, usando `geofence_geom_gist` |
-| Malla de calor de excesos, un día | **262 ms** | 1,4 s para 7 días | Agregación sin índice útil; la poda acota el trabajo a un día |
+| Puntos dentro de una zona escolar real en un día | **0,2 ms** (34 páginas) | 97 ms sin GiST (11.080 páginas, *Seq Scan*) | GiST de puntos: ~480× más rápido y ~300× menos E/S |
+| La misma consulta sin filtro de tiempo | 0,2 ms (1 partición) | 56 ms (7 particiones) | Poda de particiones: solo se toca el día pedido |
+| Viewport del mapa en una hora | **4,2 ms** | 9,6 ms sin BRIN (4.555 páginas) | PostgreSQL **combina** BRIN (tiempo) y GiST (espacio) en un *BitmapAnd* |
+| Traza de un vehículo en un día | **1,0 ms** | — | La PK `(vehicle_id, event_ts)` sirve también como índice de consulta |
+| Geocercas de una hora (consulta del worker, ~30.000 puntos contra 2.257 geocercas reales) | **1,05 s** (142 mil páginas) | **15,7 s** sin GiST de geocercas (7,6 M páginas) | GiST de geocercas: **15×**; ~28.000 puntos/s en una sesión |
+| Malla de calor de excesos, un día | **362 ms** | 2,7 s para 7 días | Agregación sin índice útil; la poda acota el trabajo a un día |
 
 | Índice | Tamaño (5 M filas) |
 |---|---:|
@@ -356,8 +356,14 @@ Lectura honesta de los números:
 
 * El índice que más cambia el resultado es el **GiST** en consultas por polígono; el BRIN
   y la poda reducen el volumen a un día o a una hora antes de que el GiST trabaje.
-* En el viewport de una hora el GiST aporta poco (5 → 8 ms), porque el BRIN ya dejó solo
-  ~30.000 candidatos. Los índices se complementan; ninguno basta solo para todo.
+* En el viewport de una hora el GiST aporta poco (4,2 → 5,6 ms), porque el BRIN ya dejó
+  solo ~30.000 candidatos. Los índices se complementan; ninguno basta solo para todo.
+* Con las 6 geocercas de la primera versión el enriquecimiento tardaba 54 ms y el GiST de
+  geocercas no se notaba: PostgreSQL podía comparar cada punto con todas. Con las 2.257
+  reales, sin índice cada punto se prueba contra todos los polígonos (7,6 M páginas
+  leídas). El perímetro urbano (1.990 vértices) no es el cuello: medido aparte, cuesta
+  ~60 ms para 30.000 puntos. Si hiciera falta más rendimiento, el siguiente paso es
+  repartir los puntos entre varias sesiones (una por partición o por vehículo).
 * La carga fue de **~44.000 filas/s** con todos los índices activos y en una sola sesión.
   El costo dominante es mantener el GiST y la PK. Para más volumen, el camino es cargar
   con `COPY` y en varias sesiones en paralelo (por ejemplo, una por partición); no se midió
