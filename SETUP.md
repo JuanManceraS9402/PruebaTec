@@ -36,6 +36,23 @@ ya terminaron.
 > Los scripts solo se ejecutan con un volumen vacío. Para reinicializar desde cero:
 > `docker compose down -v && docker compose up -d --wait`
 
+### Alternativa sin Docker (PostgreSQL + PostGIS instalados en el equipo)
+
+Para equipos sin virtualización, donde Docker no puede arrancar:
+
+1. Instala PostgreSQL (16 o superior; probado también con 19) con el instalador de EDB y,
+   desde **Stack Builder** → *Spatial Extensions*, el **PostGIS Bundle** de esa versión.
+2. En `.env` ajusta `DB_PORT` y `POSTGRES_PASSWORD` a los de tu instalación.
+3. Después del paso 3 (entorno Python), inicializa la base:
+
+   ```bash
+   python -m simon_geo.bootstrap          # --reset para recrearla desde cero
+   ```
+
+   Hace lo mismo que el contenedor: crea la base, ejecuta `db/init/*.sql` en orden y crea
+   los usuarios de login (el equivalente de `07_users.sh`). Desde ahí, el resto de esta
+   guía es igual.
+
 ## 3. Entorno Python
 
 ```bash
