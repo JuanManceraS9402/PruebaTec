@@ -85,7 +85,29 @@ Es seguro ejecutarlo varias veces: lo ya procesado no se repite.
 Opciones: `--lookback-min` (historia que se relee para continuar cada traza, 120 por
 defecto), `--settle-s` y `--no-gold`.
 
-## 8. Pruebas
+## 8. Tablero (Streamlit)
+
+```bash
+streamlit run dashboard/app.py
+```
+
+Abre <http://localhost:8501>. En la barra lateral, **Ver como** cambia el usuario de base
+de datos: como *Analista BI* los IDs salen enmascarados (`VHC-****-ABC`), y como
+*Administrador* salen reales. El mapa muestra las rutas del día, el mapa de calor y los
+puntos de infracción, las geocercas y la malla de 250 m de puntos calientes.
+
+## 9. Benchmark (millones de puntos)
+
+```bash
+python -m simon_geo.benchmark                          # ~5 M de puntos, varios minutos
+python -m simon_geo.benchmark --vehicles 100 --days 2  # prueba rápida
+```
+
+Genera los datos en un esquema aparte (`bench`), con las mismas particiones e índices que
+Bronce, y escribe `docs/benchmark.md` con los tiempos y planes de `EXPLAIN ANALYZE`. Para
+borrar esos datos: `python -m simon_geo.benchmark --drop`.
+
+## 10. Pruebas
 
 ```bash
 pytest -m "not integration"   # unitarias: no requieren base de datos

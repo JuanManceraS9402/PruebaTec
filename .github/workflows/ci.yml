@@ -18,9 +18,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e ".[dev]"
-      - run: ruff check src tests
-      - run: ruff format --check src tests
+      - run: pip install -e ".[dev,dashboard]"
+      - run: ruff check src tests dashboard
+      - run: ruff format --check src tests dashboard
       - run: pytest -m "not integration" --cov=simon_geo --cov-report=term-missing
 
   integration:
@@ -40,7 +40,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,dashboard]"
 
       - name: Cargar escenario Bogotá
         run: python -m simon_geo.seed

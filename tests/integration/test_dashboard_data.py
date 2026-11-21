@@ -1,0 +1,43 @@
+"""Consultas del tablero contra PostGIS: el enmascaramiento lo decide la base."""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+import pytest
+
+from simon_geo.config import DbRole
+from simon_geo.dashboard import data
+
+pytestmark = pytest.mark.integration
+
+MASKED = re.compile(r"^[A-Z]{3}-\*{4}-[A-Z]{3}$")
+REAL = re.compile(r"^[A-Z]{3}-[0-9]{4}-[A-Z]{3}$")
+APP = Path(__file__).resolve().parents[2] / "dashboard" / "app.py"
+
+
+@pytest.mark.parametrize(("role", "pattern"), [(DbRole.ANALYST, MASKED), (DbRole.ADMIN, REAL)])
+def test_queries_run_and_mask_by_role(conn, seeded, role, pattern) -> None:
+    c = conn(role)
+    user, is_admin = data.whoami(c)
+    assert is_admin is (role is DbRole.ADMIN)
+
+    geofences = data.geofences(c)
+    assert set(seeded) <= set(geofences["code"])
+    data.infraction_grid(c)
+
+    for day in data.available_days(c)[:3]:
+        kpis = data.daily_kpis(c, day)
+        alerts = data.infractions(c, day)
+        ids = list(kpis["vehicle_id"]) + list(alerts["vehicle_id"])
+        assert all(pattern.match(v) for v in ids), ids[:5]
+        assert kpis["vehicle_key"].str.startswith("VK-").all()
+
+
+def test_app_renders_with_database(seeded) -> None:
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_file(str(APP), default_timeout=60).run()
+    assert not at.exception
+    assert not at.error

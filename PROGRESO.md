@@ -41,7 +41,7 @@ pip install -e ".[dev,dashboard]"
 
 # 2. Verificar que todo sigue verde
 ruff check . && ruff format --check .
-pytest -m "not integration"       # esperado: 133 passed
+pytest -m "not integration"       # esperado: 161 passed
 
 # 3. Git con tu identidad (local al repo)
 git init -b main
@@ -131,7 +131,7 @@ REQUIRE_DB=1 pytest -m integration -v
 1. ~~Worker Bronce → Plata → Oro~~ **HECHO** (2026-11-20). `processing/worker.py` y `python -m simon_geo.processing`:
    - watermark por `ingested_at` con `FOR UPDATE`; lookback de 2 h para continuar el estado de la traza; escribe desde el primer `event_ts` nuevo (upsert de puntos, borrado y reinserción de alertas del rango, para corregir con datos tardíos); refresco de Oro en transacción aparte.
    - 11 tests unitarios (`tests/unit/test_worker.py`) y 7 de integración (`tests/integration/test_worker.py`). **Los de integración aún no se han ejecutado** (no hay Docker en este PC; los correrá la CI).
-2. **Benchmark Big Data** (pesa el 20 %). Pasos:
+2. **Benchmark Big Data**: código HECHO y validado en CI (`python -m simon_geo.benchmark`). **Falta ejecutarlo a escala (5 M) con Docker local y commitear `docs/benchmark.md`**; luego revisar que DESIGN.md §6 cuadre con los números. Plan original:
    - generador masivo (millones de filas) que cargue con `COPY`;
    - `EXPLAIN (ANALYZE, BUFFERS)` de consultas típicas (puntos en geocerca, ventana temporal y vehículo, heatmap), comparando sin y con índices GiST/BRIN y la poda de particiones;
    - guardar los resultados en `docs/benchmark.md`.
@@ -143,7 +143,7 @@ REQUIRE_DB=1 pytest -m integration -v
    - idempotencia;
    - el modelo de combustible;
    - cómo escalaría (Kafka, Timescale/Citus, etc.).
-4. **Dashboard Streamlit** (`dashboard/app.py`): ruta del vehículo, heatmap de infracciones (`gold.infraction_grid_250m`), KPIs y Driver Score. Debe conectarse como `analyst_demo` para mostrar el enmascaramiento.
+4. ~~Dashboard Streamlit~~ **HECHO** (falta verlo en vivo con datos). (`dashboard/app.py`): ruta del vehículo, heatmap de infracciones (`gold.infraction_grid_250m`), KPIs y Driver Score. Debe conectarse como `analyst_demo` para mostrar el enmascaramiento.
 5. **README.md** actualizado con el diagrama, la estructura y los enlaces.
 6. **Guion del video** de 5 minutos: arquitectura, demo de ingesta, demo de enmascaramiento con analista y con admin, geocercas, alertas, EXPLAIN y dashboard.
 
