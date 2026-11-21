@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -46,3 +47,9 @@ def test_app_renders_with_database(seeded) -> None:
     at = AppTest.from_file(str(APP), default_timeout=60).run()
     assert not at.exception
     assert not at.error
+    # pydeck convierte cualquier texto en expresión: "pixels" sin envolver queda como
+    # "@@=pixels" (indefinido) y las rutas se dibujan gigantes en el mapa
+    for deck in at.get("deck_gl_json_chart"):
+        for layer in json.loads(deck.proto.json)["layers"]:
+            units = {k: v for k, v in layer.items() if k.endswith("Units")}
+            assert not any(str(v).startswith("@@=") for v in units.values()), units

@@ -22,7 +22,9 @@ SEVERITY_ORDER: Final = list(SEVERITY_COLORS)
 SEVERITY_SHORT: Final = {"LOW": "Baja", "MEDIUM": "Media", "HIGH": "Alta", "CRITICAL": "Crítica"}
 NEUTRAL: Final = "#8a8f98"
 ALERT_RED: Final = "#c8102e"
-INK_MUTED: Final = "#5f6670"
+# Gris medio: se lee sobre fondo claro y oscuro. Los textos no llevan color fijo,
+# lo pone el tema de Streamlit (claro u oscuro).
+INK_MUTED: Final = "#8a8f98"
 SELECTION: Final = "vehiculo"  # nombre del parámetro de selección del ranking
 
 
@@ -32,7 +34,7 @@ def hex_color(rgba: Sequence[int]) -> str:
 
 
 def _axis(**kw: object) -> alt.Axis:
-    return alt.Axis(labelColor=INK_MUTED, titleColor=INK_MUTED, gridOpacity=0.35, **kw)
+    return alt.Axis(gridOpacity=0.35, **kw)
 
 
 def _local_naive(ts: pd.Series) -> pd.Series:
@@ -63,7 +65,7 @@ def score_ranking(kpis: pd.DataFrame, colors: Mapping[str, str]) -> alt.Chart:
         km=kpis["distance_km"].astype(float).round(1),
     )[["label", "vehicle_key", "color", "score", "speeding", "km", "harsh_events"]]
     pick = alt.selection_point(name=SELECTION, fields=["vehicle_key"], on="click", clear="dblclick")
-    y = alt.Y("label:N", sort="-x", title=None, axis=alt.Axis(labelColor="#30343b", labelLimit=180))
+    y = alt.Y("label:N", sort="-x", title=None, axis=alt.Axis(labelLimit=220))
     tooltip = [
         alt.Tooltip("label:N", title="Vehículo"),
         alt.Tooltip("score:Q", title="Driver Score", format=".1f"),
@@ -86,10 +88,10 @@ def score_ranking(kpis: pd.DataFrame, colors: Mapping[str, str]) -> alt.Chart:
         )
         .add_params(pick)
     )
-    labels = base.mark_text(align="left", dx=5, color="#30343b", fontWeight=600).encode(
+    labels = base.mark_text(align="left", dx=5, fontWeight=600, color=INK_MUTED).encode(
         x="score:Q", text=alt.Text("score:Q", format=".1f")
     )
-    return (bars + labels).properties(height=alt.Step(34))
+    return (bars + labels).properties(height=alt.Step(34), width="container")
 
 
 # ------------------------------------------------------------- infracciones
@@ -106,7 +108,7 @@ def infractions_by_zone(alerts: pd.DataFrame) -> alt.Chart:
     counts = frame.groupby(["zone", "sev", "sev_order"], as_index=False).size()
     return (
         alt.Chart(counts)
-        .mark_bar(height={"band": 0.62}, stroke="white", strokeWidth=2)
+        .mark_bar(height={"band": 0.62})
         .encode(
             y=alt.Y("zone:N", sort="-x", title=None, axis=alt.Axis(labelLimit=200)),
             x=alt.X("sum(size):Q", title="Infracciones", axis=_axis(tickMinStep=1)),
@@ -145,7 +147,7 @@ def infractions_over_time(alerts: pd.DataFrame) -> alt.Chart:
     counts = frame.groupby(["t", "sev", "sev_order"], as_index=False).size()
     return (
         alt.Chart(counts)
-        .mark_bar(stroke="white", strokeWidth=1)
+        .mark_bar()
         .encode(
             x=alt.X(
                 "t:T",

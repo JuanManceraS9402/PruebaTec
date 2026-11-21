@@ -135,8 +135,12 @@ def track_layer(tracks: list[dict]) -> pdk.Layer:
         id="tracks",
         get_path="path",
         get_color="color",
-        get_width="width",
-        width_units="pixels",
+        get_width="line_px",
+        # pydeck convierte todo texto en expresión ("@@=pixels" → indefinido, y la ruta
+        # se dibuja en unidades del mundo, gigante): hay que marcarlo como literal
+        width_units=pdk.types.String("pixels"),
+        joint_rounded=True,
+        cap_rounded=True,
         pickable=True,
     )
 
@@ -256,6 +260,12 @@ def sidebar() -> tuple[DbRole, dict[str, bool]]:
         "heatmap": st.sidebar.checkbox("Mapa de calor de infracciones", value=True),
         "alerts": st.sidebar.checkbox("Puntos de infracción", value=True),
         "hotspots": st.sidebar.checkbox("Zonas calientes (histórico)", value=False),
+        "only_focus": st.sidebar.toggle(
+            "Solo el vehículo seleccionado",
+            help="Oculta en el mapa las rutas, alertas y el mapa de calor de los demás "
+            "vehículos. El vehículo se elige con clic en el ranking (por defecto, el de "
+            "menor Driver Score).",
+        ),
     }
     return role, layers
 
@@ -325,19 +335,24 @@ def main() -> None:
     ]
     focus = picked[0] if picked else kpis["vehicle_key"].iloc[0]
 
+    # En el mapa: o se resalta el vehículo enfocado, o se deja solo él
+    solo = enabled["only_focus"]
+    map_kpis = kpis[kpis["vehicle_key"] == focus] if solo else kpis
+    map_alerts = alerts[alerts["vehicle_key"] == focus] if solo else alerts
+    highlight = picked and not solo
     tracks = [
         {
             "name": r.label,
             "path": line_path(r.track_geojson),
             "color": [
                 *track_color[r.vehicle_key],
-                255 if not picked or r.vehicle_key == focus else 70,
+                255 if not highlight or r.vehicle_key == focus else 70,
             ],
-            "width": 6 if picked and r.vehicle_key == focus else 3,
+            "line_px": 6 if highlight and r.vehicle_key == focus else 4,
             "title": r.label,
             "body": f"{r.distance_km} km recorridos · Driver Score {r.driver_score}",
         }
-        for r in kpis.itertuples()
+        for r in map_kpis.itertuples()
         if r.track_geojson
     ]
     layers = []
@@ -345,14 +360,14 @@ def main() -> None:
         layers.append(geofence_layer(geofences))
     if enabled["hotspots"] and len(hotspots):
         layers.extend(hotspot_layers(hotspots))
-    if enabled["heatmap"] and len(alerts):
-        layers.append(heatmap_layer(alerts))
+    if enabled["heatmap"] and len(map_alerts):
+        layers.append(heatmap_layer(map_alerts))
     if enabled["tracks"] and tracks:
         layers.append(track_layer(tracks))
-    if enabled["alerts"] and len(alerts):
-        layers.append(alert_layer(alerts))
+    if enabled["alerts"] and len(map_alerts):
+        layers.append(alert_layer(map_alerts))
 
-    view = view_for((t["path"] for t in tracks), alerts)
+    view = view_for((t["path"] for t in tracks), map_alerts)
     map_col, legend_col = st.columns([4, 1])
     with map_col:
         st.pydeck_chart(
@@ -371,7 +386,7 @@ def main() -> None:
             enabled,
             zones=zip(geofences["zone_type"], geofences["speed_limit_kmh"], strict=True),
             tracks=((t["name"], t["color"][:3]) for t in tracks),
-            severities=alerts["severity"],
+            severities=map_alerts["severity"],
         )
         st.html(legend_html(legend))
 
@@ -380,7 +395,12 @@ def main() -> None:
     with rank_col:
         st.subheader("Ranking de Driver Score")
         st.caption("Clic en una barra para ver su perfil y resaltar su ruta · doble clic: quitar.")
-        st.altair_chart(charts.score_ranking(kpis, hex_colors), key="ranking", on_select="rerun")
+        st.altair_chart(
+            charts.score_ranking(kpis, hex_colors),
+            key="ranking",
+            on_select="rerun",
+            width="stretch",
+        )
     with profile_col:
         focus_label = kpis.loc[kpis["vehicle_key"] == focus, "label"].iloc[0]
         st.subheader(f"Perfil del día · {focus_label}")
