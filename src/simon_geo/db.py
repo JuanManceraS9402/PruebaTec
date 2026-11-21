@@ -33,6 +33,9 @@ class PoolRegistry:
                     min_size=1,
                     max_size=self._max_size,
                     name=f"simon_geo_{role.value}",
+                    # Verifica la conexión al entregarla: tras un reinicio de la base
+                    # el pool descarta las conexiones muertas en vez de fallar.
+                    check=ConnectionPool.check_connection,
                     open=True,
                 )
                 self._pools[role] = pool

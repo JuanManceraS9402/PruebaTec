@@ -187,7 +187,10 @@ A igual prioridad gana el límite más bajo; sin geocerca con límite se aplica
 `default_speed_limit_kmh`. Así, un corredor rápido dentro del perímetro urbano puede
 tener un límite **mayor** que el urbano, algo que la regla del mínimo no permite.
 
-Escenario Bogotá: 50 km/h general (incluye autopistas, según la norma distrital), 30 km/h
+Escenario Bogotá: las tres rutas siguen la **red vial real**. Se calcularon una vez con
+OSRM sobre OpenStreetMap (`scripts/fetch_osm_routes.py`) y se versionan como GeoJSON, de
+modo que el proyecto no depende de internet. Los corredores de la Autopista Norte y la
+Autopista Sur son los tramos de esas rutas que recorren cada autopista. Límites: 50 km/h general (incluye autopistas, según la norma distrital), 30 km/h
 en zona escolar, y 20 km/h en el patio como **política interna** de la empresa.
 
 **Severidad** (`rules/speed.py`): se declara exceso solo por encima de

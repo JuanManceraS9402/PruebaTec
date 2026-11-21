@@ -110,3 +110,8 @@ Las pruebas cubren lo crítico del dominio:
 | `etl_worker` | `pipeline_worker` | Leer Bronce, escribir Plata, refrescar Oro |
 | `analyst_demo` | `bi_analyst` | Leer solo `analytics.*`, con IDs enmascarados (`VHC-****-ABC`) |
 | `admin_demo` | `fleet_admin` | Leer todas las capas, con IDs reales |
+
+---
+
+Rutas del escenario: datos © colaboradores de [OpenStreetMap](https://www.openstreetmap.org/copyright)
+(ODbL), calculadas con [OSRM](https://project-osrm.org/). Mapa base © CARTO.

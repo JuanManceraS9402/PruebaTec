@@ -9,12 +9,14 @@ from __future__ import annotations
 from collections import defaultdict
 
 import pytest
+from shapely.geometry import Point
 
 from simon_geo.domain import AlertType, ZoneType
 from simon_geo.parameters import PipelineParameters
 from simon_geo.processing.enrichment import EnrichmentResult, SilverEnricher
 from simon_geo.seed import bogota
 from simon_geo.simulator.fleet import FleetSimulator, SimulationConfig
+from simon_geo.spatial.crs import lonlat_to_metric
 from simon_geo.spatial.geofencing import GeofenceIndex, resolve_speed_limit
 from tests.conftest import T0
 
@@ -83,10 +85,27 @@ class TestBogotaSeed:
         end_lon, end_lat = r02.geometry.coords[-1]
         assert INDEX.containing(end_lon, end_lat) == []
 
-    @pytest.mark.parametrize(("code", "low", "high"), [("R01", 15, 25), ("R02", 13, 18)])
+    @pytest.mark.parametrize(
+        ("code", "low", "high"), [("R01", 25, 30), ("R02", 21, 26), ("R03", 16, 20)]
+    )
     def test_route_lengths_plausible(self, code: str, low: float, high: float) -> None:
         route = next(r for r in bogota.routes() if r.code == code)
         assert low <= route.length_km <= high
+
+    def test_corridors_follow_their_routes(self) -> None:
+        """Los corredores son tramos de la ruta real: la ruta los recorre por dentro."""
+        routes = {r.code: r for r in bogota.routes()}
+        for code, route in (("BOG-AUTONORTE", "R01"), ("BOG-AUTOSUR", "R02")):
+            inside = GEOFENCES[code].geometry.intersection(routes[route].geometry)
+            assert inside.length > 0.02, code  # > ~2 km de ruta dentro del corredor
+
+    def test_landmarks_lie_on_their_routes(self) -> None:
+        routes = {r.code: r for r in bogota.routes()}
+        assert routes["R03"].remaining_km(*bogota.SCHOOL_LONLAT) < routes["R03"].length_km
+        assert (
+            routes["R01"].metric_geometry.distance(Point(lonlat_to_metric(*bogota.CALLE80_LONLAT)))
+            < 1.0
+        )
 
 
 class TestSimulator:

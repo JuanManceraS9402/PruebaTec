@@ -1,61 +1,66 @@
 """Escenario de prueba en Bogotá D.C.
 
-Geometrías APROXIMADAS construidas a mano para la demo (no son cartografía
-oficial). Límites de velocidad de Bogotá: 50 km/h en toda la ciudad, incluidas
-autopistas y vías principales (Ley 2251 de 2022), y 30 km/h en zonas escolares.
+Las rutas siguen la red vial real: se calcularon con OSRM sobre OpenStreetMap
+(``scripts/fetch_osm_routes.py``) y se versionan en ``data/bogota_osm.geojson``
+(datos © colaboradores de OpenStreetMap, ODbL). Los corredores de geocerca son
+los tramos de esas rutas que recorren la Autopista Norte y la Autopista Sur.
+El perímetro urbano y las zonas circulares siguen siendo aproximados (no son
+cartografía oficial).
 
-Las geocercas de corredor y de alta siniestralidad mantienen el límite de 50; su
+Límites de velocidad de Bogotá: 50 km/h en toda la ciudad, incluidas autopistas
+y vías principales (Ley 2251 de 2022), y 30 km/h en zonas escolares. Las
+geocercas de corredor y de alta siniestralidad mantienen el límite de 50; su
 valor está en que identifican la zona, lo que permite agravar la severidad del
 exceso (ver ``rules.speed.ESCALATING_ZONES``) y analizar las infracciones por
 corredor en la capa Oro. El patio logístico usa 20 km/h, que es una política
 interna de la empresa y no un límite legal.
 
 Rutas (todas salen del patio de Fontibón):
-  R01  Fontibón → Calle 26 → Autopista Norte (Calle 170)
-  R02  Fontibón → Av. Boyacá → Autopista Sur → salida a Soacha (sale del perímetro)
+  R01  Fontibón → Calle 26 → Calle 80 → Autopista Norte (Portal Norte)
+  R02  Fontibón → Av. Boyacá → Autopista Sur → Soacha (sale del perímetro)
   R03  Fontibón → Calle 26 → Teusaquillo (zona escolar) → Centro
 """
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Final
 
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString, Polygon, shape
 
 from simon_geo.domain import Geofence, Vehicle, ZoneType
 from simon_geo.simulator.fleet import DRIVER_PROFILES, SimulatedVehicle
-from simon_geo.spatial.crs import circle, corridor
+from simon_geo.spatial.crs import circle, corridor, to_metric, to_wgs84
 from simon_geo.spatial.routes import PlannedRoute
 
-# --------------------------------------------------------------------- rutas
-_R01 = [
-    (-74.1500, 4.6680),
-    (-74.1200, 4.6600),
-    (-74.0950, 4.6480),
-    (-74.0700, 4.6550),
-    (-74.0600, 4.6800),
-    (-74.0580, 4.7000),
-    (-74.0520, 4.7450),
-    (-74.0480, 4.7550),
-]
+OSM_DATA: Final = Path(__file__).with_name("data") / "bogota_osm.geojson"
 
-_R02 = [
-    (-74.1500, 4.6680),
-    (-74.1400, 4.6400),
-    (-74.1400, 4.6150),
-    (-74.1550, 4.6000),
-    (-74.1800, 4.5900),
-    (-74.2000, 4.5850),
-    (-74.2150, 4.5800),
-]
 
-_R03 = [
-    (-74.1500, 4.6680),
-    (-74.1100, 4.6500),
-    (-74.0850, 4.6370),
-    (-74.0720, 4.6150),
-    (-74.0650, 4.6000),
-]
+# ------------------------------------------------------------ datos de OSM
+@lru_cache(maxsize=1)
+def _osm() -> dict[tuple[str, str], Any]:
+    """Geometrías de ``bogota_osm.geojson`` indexadas por (kind, code)."""
+    data = json.loads(OSM_DATA.read_text(encoding="utf-8"))
+    return {
+        (f["properties"]["kind"], f["properties"]["code"]): shape(f["geometry"])
+        for f in data["features"]
+    }
+
+
+def _route_line(code: str) -> LineString:
+    return _osm()[("route", code)]
+
+
+def _on_route(route_code: str, landmark: str) -> tuple[float, float]:
+    """Proyecta un punto de referencia sobre la ruta (en metros reales)."""
+    line = to_metric(_route_line(route_code))
+    point = to_metric(_osm()[("landmark", landmark)])
+    snapped = to_wgs84(line.interpolate(line.project(point)))
+    return round(snapped.x, 6), round(snapped.y, 6)
+
 
 # ---------------------------------------------------------------- geocercas
 _URBAN_PERIMETER = Polygon(
@@ -73,9 +78,9 @@ _URBAN_PERIMETER = Polygon(
     ]
 )
 
-DEPOT_LONLAT = (-74.1500, 4.6680)
-SCHOOL_LONLAT = (-74.0850, 4.6370)
-CALLE80_LONLAT = (-74.0580, 4.7000)
+DEPOT_LONLAT: Final = _route_line("R01").coords[0]
+SCHOOL_LONLAT: Final = _on_route("R03", "PARKWAY")  # Park Way, Teusaquillo
+CALLE80_LONLAT: Final = _on_route("R01", "HEROES")  # Calle 80 con Autopista Norte
 
 
 def geofences() -> list[Geofence]:
@@ -88,7 +93,7 @@ def geofences() -> list[Geofence]:
             "Corredor Autopista Norte",
             ZoneType.HIGHWAY,
             50,
-            corridor(_R01[5:], half_width_m=120),
+            corridor(_osm()[("corridor", "AUTONORTE")].coords, half_width_m=120),
         ),
         Geofence(
             3,
@@ -104,7 +109,7 @@ def geofences() -> list[Geofence]:
             "Corredor Autopista Sur (alta siniestralidad)",
             ZoneType.HIGH_RISK,
             50,
-            corridor(_R02[3:6], half_width_m=150),
+            corridor(_osm()[("corridor", "AUTOSUR")].coords, half_width_m=150),
         ),
         Geofence(
             5,
@@ -127,9 +132,11 @@ def geofences() -> list[Geofence]:
 
 def routes() -> list[PlannedRoute]:
     return [
-        PlannedRoute(1, "R01", "Fontibón → Autopista Norte (Calle 170)", LineString(_R01)),
-        PlannedRoute(2, "R02", "Fontibón → Autopista Sur → Soacha", LineString(_R02)),
-        PlannedRoute(3, "R03", "Fontibón → Teusaquillo → Centro", LineString(_R03)),
+        PlannedRoute(1, "R01", "Fontibón → Calle 26 → Autopista Norte", _route_line("R01")),
+        PlannedRoute(
+            2, "R02", "Fontibón → Av. Boyacá → Autopista Sur → Soacha", _route_line("R02")
+        ),
+        PlannedRoute(3, "R03", "Fontibón → Calle 26 → Teusaquillo → Centro", _route_line("R03")),
     ]
 
 
