@@ -25,7 +25,9 @@ def test_queries_run_and_mask_by_role(conn, seeded, role, pattern) -> None:
 
     geofences = data.geofences(c)
     assert set(seeded) <= set(geofences["code"])
-    data.infraction_grid(c)
+    hotspots = data.infraction_hotspots(c)
+    assert list(hotspots["hotspot_rank"]) == list(range(1, len(hotspots) + 1))
+    assert hotspots["infractions"].is_monotonic_decreasing
 
     for day in data.available_days(c)[:3]:
         kpis = data.daily_kpis(c, day)

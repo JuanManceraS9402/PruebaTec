@@ -117,8 +117,11 @@ class TestViewFor:
 
 def test_app_starts_without_crashing(monkeypatch) -> None:
     """La app arranca; sin base de datos muestra un error guiado en vez de una traza."""
+    import streamlit as st
     from streamlit.testing.v1 import AppTest
 
+    st.cache_resource.clear()  # que no reutilice una conexión abierta por otra prueba
+    st.cache_data.clear()
     monkeypatch.setenv("DB_PORT", "1")  # puerto cerrado: falla rápido y de forma determinista
     from simon_geo.config import get_settings
 
@@ -132,7 +135,7 @@ def test_app_starts_without_crashing(monkeypatch) -> None:
 
 
 class TestLegend:
-    ALL_ON = {"geofences": True, "tracks": True, "heatmap": True, "alerts": True, "grid": True}
+    ALL_ON = {"geofences": True, "tracks": True, "heatmap": True, "alerts": True, "hotspots": True}
     ZONES = [("URBAN", 50), ("SCHOOL", 30), ("HIGHWAY", 50), ("HIGH_RISK", 50), ("DEPOT", 20)]
 
     def legend(self, enabled=None, **kw):
@@ -153,7 +156,7 @@ class TestLegend:
             "Puntos de infracción",
             "Rutas del día",
             "Mapa de calor",
-            "Puntos calientes (malla 250 m)",
+            "Zonas calientes (histórico)",
             "Geocercas",
         ]
 

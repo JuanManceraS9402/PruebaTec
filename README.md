@@ -13,8 +13,8 @@ la enriquece con geocercas, genera alertas y expone KPIs de *Driver Score* para 
   siniestralidad, corredor, patio), con severidad escalada y **una alerta por episodio**.
 * **Combustible predictivo**: consumo real por regresión en ventana móvil, autonomía y
   alerta si no alcanza para terminar la **ruta asignada**.
-* **Capa Oro** con vistas materializadas (KPIs diarios, Driver Score, malla de calor de
-  250 m en EPSG:9377) y un **tablero Streamlit** con mapa.
+* **Capa Oro** con vistas materializadas (KPIs diarios, Driver Score, malla de 250 m y
+  zonas calientes por DBSCAN en EPSG:9377) y un **tablero Streamlit** con mapa.
 * **Benchmark** con millones de puntos que compara planes con y sin GiST/BRIN y con y
   sin poda de particiones.
 

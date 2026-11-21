@@ -147,6 +147,51 @@ CREATE UNIQUE INDEX infraction_grid_pk   ON gold.infraction_grid_250m (cell_x, c
 CREATE INDEX        infraction_grid_geom ON gold.infraction_grid_250m USING gist (cell_geom);
 
 -- ---------------------------------------------------------------------
+-- Zonas calientes: agrupamiento DBSCAN de los excesos de velocidad
+-- ---------------------------------------------------------------------
+-- La malla cuenta infracciones por celda, pero en un mapa son decenas de
+-- cuadros sueltos. Aquí se agrupan los puntos que tienen al menos 3 excesos a
+-- menos de 600 m (ST_ClusterDBSCAN, en metros de EPSG:9377); los excesos
+-- aislados quedan como ruido y no forman zona. Cada zona es la envolvente
+-- convexa de sus puntos con un margen de 150 m: pocos polígonos, cada uno con
+-- un significado (dónde se repite el exceso).
+CREATE MATERIALIZED VIEW gold.infraction_hotspot AS
+WITH pts AS (
+  SELECT a.vehicle_id, a.severity, a.event_ts, ST_Transform(a.geom, 9377) AS g
+  FROM silver.alert a
+  WHERE a.alert_type = 'SPEEDING'
+), clustered AS (
+  SELECT p.*, ST_ClusterDBSCAN(p.g, eps => 600, minpoints => 3) OVER () AS cluster_id
+  FROM pts p
+), zones AS (
+  SELECT
+    count(*)                                                AS infractions,
+    count(*) FILTER (WHERE severity IN ('HIGH', 'CRITICAL')) AS severe_infractions,
+    count(DISTINCT vehicle_id)                              AS vehicles,
+    min(event_ts)                                           AS first_seen,
+    max(event_ts)                                           AS last_seen,
+    ST_Buffer(ST_ConvexHull(ST_Collect(g)), 150, 'quad_segs=4') AS g
+  FROM clustered
+  WHERE cluster_id IS NOT NULL
+  GROUP BY cluster_id
+)
+SELECT
+  row_number() OVER (ORDER BY infractions DESC, severe_infractions DESC, first_seen)::int
+                                                          AS hotspot_rank,
+  infractions,
+  severe_infractions,
+  vehicles,
+  first_seen,
+  last_seen,
+  round((ST_Area(g) / 1e6)::numeric, 3)                   AS area_km2,
+  ST_Transform(ST_SimplifyPreserveTopology(g, 10), 4326)  AS geom
+FROM zones
+WITH DATA;
+
+CREATE UNIQUE INDEX infraction_hotspot_pk   ON gold.infraction_hotspot (hotspot_rank);
+CREATE INDEX        infraction_hotspot_geom ON gold.infraction_hotspot USING gist (geom);
+
+-- ---------------------------------------------------------------------
 -- Refresco de la capa Oro (lo invoca el worker ETL tras cada lote)
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION gold.refresh_all(p_concurrently boolean DEFAULT true)
@@ -162,10 +207,12 @@ BEGIN
     REFRESH MATERIALIZED VIEW CONCURRENTLY gold.vehicle_daily_kpi;
     REFRESH MATERIALIZED VIEW CONCURRENTLY gold.infraction_point;
     REFRESH MATERIALIZED VIEW CONCURRENTLY gold.infraction_grid_250m;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY gold.infraction_hotspot;
   ELSE
     REFRESH MATERIALIZED VIEW gold.vehicle_daily_kpi;
     REFRESH MATERIALIZED VIEW gold.infraction_point;
     REFRESH MATERIALIZED VIEW gold.infraction_grid_250m;
+    REFRESH MATERIALIZED VIEW gold.infraction_hotspot;
   END IF;
 END;
 $$;

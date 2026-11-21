@@ -37,10 +37,12 @@ WHERE local_day = %(day)s
 ORDER BY event_ts
 """
 
-_GRID: Final = """
-SELECT alert_type::text AS alert_type, infractions, severe_infractions,
-       ST_AsGeoJSON(cell_geom, 6) AS cell_geojson
-FROM analytics.infraction_grid_250m
+_HOTSPOTS: Final = """
+SELECT hotspot_rank, infractions, severe_infractions, vehicles, area_km2,
+       ST_AsGeoJSON(geom, 6) AS geojson,
+       ST_X(ST_PointOnSurface(geom)) AS label_lon, ST_Y(ST_PointOnSurface(geom)) AS label_lat
+FROM analytics.infraction_hotspot
+ORDER BY hotspot_rank
 """
 
 _GEOFENCES: Final = """
@@ -72,8 +74,9 @@ def infractions(conn: psycopg.Connection, day: date) -> pd.DataFrame:
     return _frame(conn, _INFRACTIONS, {"day": day})
 
 
-def infraction_grid(conn: psycopg.Connection) -> pd.DataFrame:
-    return _frame(conn, _GRID)
+def infraction_hotspots(conn: psycopg.Connection) -> pd.DataFrame:
+    """Zonas calientes históricas (DBSCAN en la capa Oro), de mayor a menor."""
+    return _frame(conn, _HOTSPOTS)
 
 
 def geofences(conn: psycopg.Connection) -> pd.DataFrame:

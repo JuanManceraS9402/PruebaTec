@@ -20,6 +20,7 @@ from simon_geo.config import DbRole, get_settings
 from simon_geo.dashboard import data
 from simon_geo.dashboard.views import (
     HEATMAP_COLORS,
+    HOTSPOT_COLOR,
     SEVERITY_COLORS,
     ZONE_COLORS,
     build_legend,
@@ -82,7 +83,7 @@ def load_day(role: DbRole, day: date) -> tuple[pd.DataFrame, pd.DataFrame]:
 @st.cache_data(ttl=300, show_spinner=False)
 def load_static(role: DbRole) -> tuple[pd.DataFrame, pd.DataFrame, tuple[str, bool]]:
     conn = conn_for(role)
-    return data.geofences(conn), data.infraction_grid(conn), data.whoami(conn)
+    return data.geofences(conn), data.infraction_hotspots(conn), data.whoami(conn)
 
 
 # ------------------------------------------------------------------- capas
@@ -157,31 +158,53 @@ def alert_layer(alerts: pd.DataFrame) -> pdk.Layer:
     )
 
 
-def grid_layer(grid: pd.DataFrame) -> pdk.Layer:
-    totals = (
-        grid.groupby("cell_geojson", as_index=False)[["infractions", "severe_infractions"]]
-        .sum()
-        .to_dict("records")
+def hotspot_layers(hotspots: pd.DataFrame) -> list[pdk.Layer]:
+    """Zonas calientes: polígono con opacidad según infracciones y su número de ranking."""
+    records = hotspots.to_dict("records")
+    fc = feature_collection(
+        records,
+        "geojson",
+        ("hotspot_rank", "infractions", "severe_infractions", "vehicles", "area_km2"),
     )
-    fc = feature_collection(totals, "cell_geojson", ("infractions", "severe_infractions"))
-    peak = max((f["properties"]["infractions"] for f in fc["features"]), default=1)
+    peak = max((r["infractions"] for r in records), default=1)
     for f in fc["features"]:
         p = f["properties"]
-        alpha = int(60 + 170 * p["infractions"] / peak)
-        p["fill"] = [230, 57, 70, alpha]
+        p["fill"] = [*HOTSPOT_COLOR, int(40 + 110 * p["infractions"] / peak)]
         f["tooltip"] = (
-            f"<b>Celda 250 m</b><br>{p['infractions']} infracciones "
-            f"({p['severe_infractions']} graves)"
+            f"<b>Zona caliente #{p['hotspot_rank']}</b><br>{p['infractions']} excesos "
+            f"({p['severe_infractions']} graves) · {p['vehicles']} vehículo(s)"
+            f"<br>{p['area_km2']} km² · histórico acumulado"
         )
-    return pdk.Layer(
-        "GeoJsonLayer",
-        fc,
-        id="grid",
-        filled=True,
-        stroked=False,
-        get_fill_color="properties.fill",
-        pickable=True,
-    )
+    labels = [
+        {"position": [r["label_lon"], r["label_lat"]], "text": f"#{r['hotspot_rank']}"}
+        for r in records
+    ]
+    return [
+        pdk.Layer(
+            "GeoJsonLayer",
+            fc,
+            id="hotspots",
+            filled=True,
+            stroked=True,
+            get_fill_color="properties.fill",
+            get_line_color=[*HOTSPOT_COLOR, 230],
+            line_width_min_pixels=2,
+            pickable=True,
+        ),
+        pdk.Layer(
+            "TextLayer",
+            labels,
+            id="hotspot-labels",
+            get_position="position",
+            get_text="text",
+            get_size=15,
+            get_color=[255, 255, 255],
+            outline_width=3,
+            outline_color=[*HOTSPOT_COLOR, 255],
+            font_weight=700,
+            font_settings={"sdf": True},
+        ),
+    ]
 
 
 # --------------------------------------------------------------------- UI
@@ -198,7 +221,7 @@ def sidebar() -> tuple[DbRole, dict[str, bool]]:
         "tracks": st.sidebar.checkbox("Rutas del día", value=True),
         "heatmap": st.sidebar.checkbox("Mapa de calor de infracciones", value=True),
         "alerts": st.sidebar.checkbox("Puntos de infracción", value=True),
-        "grid": st.sidebar.checkbox("Puntos calientes (malla 250 m, histórico)", value=False),
+        "hotspots": st.sidebar.checkbox("Zonas calientes (histórico)", value=False),
     }
     return role, layers
 
@@ -219,7 +242,7 @@ def main() -> None:
     role, enabled = sidebar()
     try:
         days = load_days(role)
-        geofences, grid, (db_user, is_admin) = load_static(role)
+        geofences, hotspots, (db_user, is_admin) = load_static(role)
     except psycopg.OperationalError as exc:
         st.error(
             "No hay conexión con PostGIS. Levanta la base (`docker compose up -d --wait`, o "
@@ -261,8 +284,8 @@ def main() -> None:
     layers = []
     if enabled["geofences"] and len(geofences):
         layers.append(geofence_layer(geofences))
-    if enabled["grid"] and len(grid):
-        layers.append(grid_layer(grid))
+    if enabled["hotspots"] and len(hotspots):
+        layers.extend(hotspot_layers(hotspots))
     if enabled["heatmap"] and len(alerts):
         layers.append(heatmap_layer(alerts))
     if enabled["tracks"] and tracks:

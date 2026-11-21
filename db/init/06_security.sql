@@ -211,6 +211,9 @@ LEFT JOIN security.vehicle_pseudonym vp ON vp.vehicle_id = p.vehicle_id;
 CREATE VIEW analytics.infraction_grid_250m AS
 SELECT * FROM gold.infraction_grid_250m;
 
+CREATE VIEW analytics.infraction_hotspot AS
+SELECT * FROM gold.infraction_hotspot;
+
 CREATE VIEW analytics.geofence AS
 SELECT geofence_id, code, name, zone_type, speed_limit_kmh, geom
 FROM ref.geofence

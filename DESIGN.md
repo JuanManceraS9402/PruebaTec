@@ -89,7 +89,8 @@ para que reprocesar no duplique alertas.
 |---|---|
 | `gold.vehicle_daily_kpi` | Un registro por vehículo y día local: distancia, % del tiempo en exceso, eventos bruscos/100 km, consumo, tanqueos, **Driver Score** y la traza del día (`LineString`) |
 | `gold.infraction_point` | Alertas desnormalizadas con nombre y tipo de geocerca (capa de puntos del mapa) |
-| `gold.infraction_grid_250m` | Malla de 250 m × 250 m con conteo de infracciones (mapa de calor) |
+| `gold.infraction_grid_250m` | Malla de 250 m × 250 m con conteo de infracciones (para BI) |
+| `gold.infraction_hotspot` | Zonas calientes: `ST_ClusterDBSCAN` de los excesos (≥ 3 a menos de 600 m, en EPSG:9377); cada zona es la envolvente convexa con 150 m de margen. Pocos polígonos con significado, en vez de decenas de celdas sueltas en el mapa |
 | `gold.driver_score()` | Fórmula del score en **un solo lugar**, `IMMUTABLE` |
 
 Son **vistas materializadas con índice único**, lo que permite

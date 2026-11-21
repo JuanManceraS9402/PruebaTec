@@ -157,7 +157,7 @@ HEATMAP_COLORS: Final[tuple[RGBA, ...]] = (
     [240, 59, 32],
     [189, 0, 38],
 )
-GRID_COLOR: Final[RGBA] = [230, 57, 70]
+HOTSPOT_COLOR: Final[RGBA] = [189, 0, 38]
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,18 +208,18 @@ def build_legend(
                 "Ponderado por severidad.",
             )
         )
-    if enabled.get("grid"):
+    if enabled.get("hotspots"):
         sections.append(
             LegendSection(
-                "Puntos calientes (malla 250 m)",
+                "Zonas calientes (histórico)",
                 (
                     LegendItem(
-                        "pocas → muchas infracciones",
-                        ([*GRID_COLOR, 60], [*GRID_COLOR, 230]),
+                        "menos → más infracciones",
+                        ([*HOTSPOT_COLOR, 40], [*HOTSPOT_COLOR, 150]),
                         "ramp",
                     ),
                 ),
-                "Histórico acumulado, celdas de 250 m × 250 m.",
+                "≥ 3 excesos a menos de 600 m (DBSCAN). #1 = la zona con más excesos.",
             )
         )
     limits: dict[str, set[int]] = {}
