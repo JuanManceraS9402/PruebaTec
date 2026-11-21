@@ -32,17 +32,42 @@ from simon_geo.spatial.routes import PlannedRoute
 
 @dataclass(frozen=True, slots=True)
 class DriverProfile:
+    """Forma de conducir de un perfil simulado.
+
+    La velocidad objetivo es ``límite × compliance``, con dos matices realistas:
+
+    * ``low_limit_floor_kmh``: en zonas de límite bajo (escolar, patio) el conductor
+      no baja de esta velocidad, es decir, no reduce lo suficiente.
+    * Rachas: con probabilidad ``burst_prob`` por reporte empieza un tramo de
+      ``burst_s`` segundos a ``límite × burst_factor`` (adelantamientos, vía libre).
+    """
+
     name: str
     compliance: float  # velocidad objetivo = límite × compliance
     max_accel_mps2: float  # aceleración máxima habitual
-    harsh_brake_prob: float  # probabilidad por reporte de frenada brusca
+    harsh_brake_prob: float  # probabilidad por reporte de frenada brusca (a más de 50 km/h)
     consumption_factor: float  # conducción agresiva consume más
+    low_limit_floor_kmh: float = 0.0
+    burst_prob: float = 0.0
+    burst_factor: float = 1.0
+    burst_s: tuple[float, float] = (20.0, 40.0)
 
 
 DRIVER_PROFILES = MappingProxyType(
     {
         "compliant": DriverProfile("compliant", 0.92, 1.2, 0.000, 1.00),
-        "moderate": DriverProfile("moderate", 1.15, 1.8, 0.004, 1.08),
+        # Respeta el límite casi siempre, pero tiene rachas de exceso y no reduce lo
+        # suficiente en zonas de 30 km/h o menos.
+        "moderate": DriverProfile(
+            "moderate",
+            0.97,
+            1.8,
+            0.002,
+            1.08,
+            low_limit_floor_kmh=36.0,
+            burst_prob=0.006,
+            burst_factor=1.2,
+        ),
         "aggressive": DriverProfile("aggressive", 1.35, 3.4, 0.012, 1.20),
     }
 )
@@ -105,6 +130,7 @@ class FleetSimulator:
         fuel_l = sv.initial_fuel_pct / 100 * tank
         ts = sv.start_ts
         refueled = False
+        burst_until = ts
 
         def emit(speed: float) -> Iterator[TelemetryPoint]:
             lon, lat = sv.route.point_at_m(s_m)
@@ -138,7 +164,12 @@ class FleetSimulator:
             decision = resolve_speed_limit(
                 self._index.containing(lon, lat), self._params.default_speed_limit_kmh
             )
-            target = decision.limit_kmh * sv.driver.compliance * rng.uniform(0.95, 1.05)
+            driver = sv.driver
+            if ts >= burst_until and rng.random() < driver.burst_prob:
+                burst_until = ts + timedelta(seconds=rng.uniform(*driver.burst_s))
+            factor = driver.burst_factor if ts < burst_until else driver.compliance
+            limit = decision.limit_kmh
+            target = max(limit * factor, driver.low_limit_floor_kmh) * rng.uniform(0.95, 1.05)
 
             if v_kmh > 50 and rng.random() < sv.driver.harsh_brake_prob:
                 dv = -rng.uniform(3.8, 5.0) * dt * 3.6

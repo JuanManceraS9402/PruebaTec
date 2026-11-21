@@ -167,3 +167,15 @@ class TestEndToEnd:
         """El consumo estimado converge al real simulado (nominal × factor del conductor)."""
         last = [p for p in result.points if p.vehicle_id == "VHC-8472-ABC"][-1]
         assert last.consumption_l_100km == pytest.approx(32 * 1.00, rel=0.10)
+
+
+def test_driver_profiles_rank_by_time_speeding(result: EnrichmentResult) -> None:
+    """Cumplido nunca excede, moderado excede a ratos y agresivo casi siempre."""
+    share: dict[str, float] = {}
+    for vid in {p.vehicle_id for p in result.points}:
+        pts = [p for p in result.points if p.vehicle_id == vid and not p.is_gps_outlier]
+        share[vid] = sum(p.is_speeding for p in pts) / len(pts)
+    assert share["VHC-8472-ABC"] == 0
+    for moderate in ("VHC-5521-KLM", "VHC-2048-QWE"):
+        assert 0.02 < share[moderate] < 0.40, (moderate, share[moderate])
+    assert share["VHC-1935-BOG"] > 0.80
