@@ -34,6 +34,9 @@ QUALIFIED: Final = f"{SCHEMA}.{TABLE}"
 # Índices de la tabla de benchmark (mismos nombres que en Bronce, otro esquema)
 GIST_INDEX: Final = f"{SCHEMA}.telemetry_raw_geom_gist"
 BRIN_INDEX: Final = f"{SCHEMA}.telemetry_raw_event_brin"
+GEOFENCE_GIST_INDEX: Final = "ref.geofence_geom_gist"
+# Zona escolar real (datos abiertos de Bogotá) en Teusaquillo, junto al Park Way
+SCHOOL_ZONE_CODE: Final = "ESC-311001033536-A"
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +109,7 @@ def scenarios(cfg: BenchmarkConfig) -> list[Scenario]:
     hour_range = f"b.event_ts >= '{day} 15:00+00' AND b.event_ts < '{day} 16:00+00'"
     # Viewport de mapa en el centro de Bogotá (~3 km × 3 km)
     viewport = "ST_MakeEnvelope(-74.09, 4.63, -74.06, 4.66, 4326)"
-    school = "(SELECT geom FROM ref.geofence WHERE code = 'BOG-ESC-TEUSAQUILLO')"
+    school = f"(SELECT geom FROM ref.geofence WHERE code = '{SCHOOL_ZONE_CODE}')"
 
     points_in_zone = f"""
         SELECT count(*) FROM {QUALIFIED} b
@@ -137,7 +140,7 @@ def scenarios(cfg: BenchmarkConfig) -> list[Scenario]:
         Scenario(
             "zone",
             "Puntos dentro de una geocerca en un día",
-            "¿Cuántos reportes hubo dentro de la zona escolar de Teusaquillo ayer?",
+            "¿Cuántos reportes hubo ayer dentro de una zona escolar de Teusaquillo?",
             (
                 Variant("Con índices (GiST + BRIN + poda)", points_in_zone.format(time=day_range)),
                 Variant(
@@ -170,8 +173,12 @@ def scenarios(cfg: BenchmarkConfig) -> list[Scenario]:
         Scenario(
             "enrichment",
             "Enriquecimiento de geocercas de una hora (consulta del worker)",
-            "Geocercas de cada punto con LEFT JOIN LATERAL + ST_Intersects.",
-            (Variant("Con índices", enrichment_hour),),
+            "Geocercas de cada punto con LEFT JOIN LATERAL + ST_Intersects "
+            "(~2.250 geocercas reales).",
+            (
+                Variant("Con índices", enrichment_hour),
+                Variant("Sin GiST de geocercas", enrichment_hour, drop_index=GEOFENCE_GIST_INDEX),
+            ),
         ),
         Scenario(
             "heatmap",

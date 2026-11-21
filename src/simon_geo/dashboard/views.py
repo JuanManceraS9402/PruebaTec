@@ -11,6 +11,8 @@ from decimal import Decimal
 from typing import Any, Final
 
 import pandas as pd
+import shapely
+from shapely.geometry import LineString
 
 RGBA = list[int]
 
@@ -112,6 +114,31 @@ def fleet_summary(kpis: pd.DataFrame, alerts: pd.DataFrame) -> FleetSummary:
         speeding_alerts=int((alert_types == "SPEEDING").sum()),
         fuel_alerts=int((alert_types == "LOW_FUEL_RANGE").sum()),
     )
+
+
+def geofences_on_paths(
+    geofences: pd.DataFrame,
+    paths: Iterable[list[list[float]]],
+    zone_types: frozenset[str] = frozenset({"SCHOOL"}),
+) -> pd.DataFrame:
+    """Deja de ``zone_types`` solo las geocercas que tocan alguna ruta; el resto pasa
+    completo. Con ~2.200 zonas escolares reales, dibujarlas todas tapa el mapa.
+
+    ``geofences`` necesita ``zone_type`` y ``geojson``. Usa un R-tree (STRtree) sobre
+    las geometrías candidatas: una consulta por ruta en lugar de una por geocerca.
+    """
+    lines = [LineString(p) for p in paths if len(p) >= 2]
+    filtered = geofences["zone_type"].isin(zone_types)
+    if not filtered.any():
+        return geofences
+    candidates = geofences[filtered]
+    keep = set()
+    if lines:
+        tree = shapely.STRtree(shapely.from_geojson(candidates["geojson"].to_numpy()))
+        for line in lines:
+            keep.update(tree.query(line, predicate="intersects").tolist())
+    on_path = candidates.iloc[sorted(keep)]
+    return pd.concat([geofences[~filtered], on_path]).sort_index()
 
 
 def view_for(paths: Iterable[list[list[float]]], points: pd.DataFrame) -> dict[str, float]:

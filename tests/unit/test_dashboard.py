@@ -17,6 +17,7 @@ from simon_geo.dashboard.views import (
     build_legend,
     feature_collection,
     fleet_summary,
+    geofences_on_paths,
     legend_html,
     line_path,
     vehicle_label,
@@ -188,3 +189,49 @@ class TestLegend:
         assert "<script>" not in out and "&lt;script&gt;" in out
         assert "linear-gradient" in out  # rampa del mapa de calor
         assert legend_html([]).count("No hay capas") == 1
+
+
+class TestGeofencesOnPaths:
+    @staticmethod
+    def square(lon: float, lat: float, half: float = 0.001) -> str:
+        ring = [
+            [lon - half, lat - half],
+            [lon + half, lat - half],
+            [lon + half, lat + half],
+            [lon - half, lat + half],
+            [lon - half, lat - half],
+        ]
+        return json.dumps({"type": "Polygon", "coordinates": [ring]})
+
+    def frame(self) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "code": ["URB", "ESC-ON", "ESC-OFF", "RISK-OFF"],
+                "zone_type": ["URBAN", "SCHOOL", "SCHOOL", "HIGH_RISK"],
+                "geojson": [
+                    self.square(-74.1, 4.65, 0.5),
+                    self.square(-74.10, 4.65),
+                    self.square(-74.00, 4.70),
+                    self.square(-74.00, 4.70),
+                ],
+            }
+        )
+
+    def test_keeps_schools_on_route_and_every_other_zone(self) -> None:
+        out = geofences_on_paths(self.frame(), [[[-74.11, 4.65], [-74.09, 4.65]]])
+        assert list(out["code"]) == ["URB", "ESC-ON", "RISK-OFF"]
+
+    def test_no_routes_hides_all_schools(self) -> None:
+        out = geofences_on_paths(self.frame(), [])
+        assert "SCHOOL" not in set(out["zone_type"])
+
+
+def test_orthophoto_style_is_served_and_attributed() -> None:
+    """La ortofoto es un estilo MapLibre servido por la app (enableStaticServing)."""
+    root = APP.parents[1]
+    style = json.loads((APP.parent / "static" / "ortofoto_bogota_2025.json").read_text("utf-8"))
+    assert style["version"] == 8
+    source = style["sources"]["ortofoto"]
+    assert "{bbox-epsg-3857}" in source["tiles"][0] and "exportImage" in source["tiles"][0]
+    assert "IDECA" in source["attribution"]
+    assert "enableStaticServing = true" in (root / ".streamlit" / "config.toml").read_text("utf-8")

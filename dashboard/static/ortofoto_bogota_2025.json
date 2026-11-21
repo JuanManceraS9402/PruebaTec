@@ -1,0 +1,31 @@
+{
+  "version": 8,
+  "name": "Ortofoto urbana de Bogotá 2025",
+  "sources": {
+    "ortofoto": {
+      "type": "raster",
+      "tiles": [
+        "https://serviciosgis.catastrobogota.gov.co/image/rest/services/imagenesfunciones/orthourbana2025funcion/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=jpg&bandIds=0,1,2&f=image"
+      ],
+      "tileSize": 256,
+      "minzoom": 10,
+      "maxzoom": 21,
+      "bounds": [-74.225, 4.486, -74.019, 4.838],
+      "attribution": "Ortofoto urbana 2025 © Secretaría Distrital de Planeación · IDECA – UAECD"
+    },
+    "etiquetas": {
+      "type": "raster",
+      "tiles": [
+        "https://a.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png",
+        "https://b.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "attribution": "© OpenStreetMap contributors © CARTO"
+    }
+  },
+  "layers": [
+    {"id": "fondo", "type": "background", "paint": {"background-color": "#c9c9c4"}},
+    {"id": "ortofoto", "type": "raster", "source": "ortofoto"},
+    {"id": "etiquetas", "type": "raster", "source": "etiquetas", "paint": {"raster-opacity": 0.9}}
+  ]
+}

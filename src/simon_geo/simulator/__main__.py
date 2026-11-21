@@ -23,10 +23,20 @@ from simon_geo.spatial.geofencing import GeofenceIndex
 BOGOTA_TZ = ZoneInfo("America/Bogota")
 
 
-def _default_start() -> datetime:
-    """Hoy a las 06:00 hora de Bogotá, en UTC."""
-    today = datetime.now(BOGOTA_TZ).date()
-    return datetime.combine(today, time(6, 0), tzinfo=BOGOTA_TZ).astimezone(UTC)
+# La jornada simulada dura menos de una hora; con este margen ya terminó del todo
+_SHIFT_DONE_AFTER = timedelta(hours=2)
+
+
+def _default_start(now: datetime | None = None) -> datetime:
+    """La jornada más reciente que ya terminó: hoy a las 06:00 (Bogotá) o, si aún no
+    ha terminado, ayer. La API rechaza paquetes con fecha futura, así que simular
+    "hoy" de madrugada no cargaría nada."""
+    now = now or datetime.now(UTC)
+    local_now = now.astimezone(BOGOTA_TZ)
+    start = datetime.combine(local_now.date(), time(6, 0), tzinfo=BOGOTA_TZ)
+    if local_now < start + _SHIFT_DONE_AFTER:
+        start -= timedelta(days=1)
+    return start.astimezone(UTC)
 
 
 def main(argv: list[str] | None = None) -> int:

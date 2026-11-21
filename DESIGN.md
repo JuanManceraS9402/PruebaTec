@@ -188,11 +188,33 @@ A igual prioridad gana el límite más bajo; sin geocerca con límite se aplica
 `default_speed_limit_kmh`. Así, un corredor rápido dentro del perímetro urbano puede
 tener un límite **mayor** que el urbano, algo que la regla del mínimo no permite.
 
-Escenario Bogotá: las tres rutas siguen la **red vial real**. Se calcularon una vez con
-OSRM sobre OpenStreetMap (`scripts/fetch_osm_routes.py`) y se versionan como GeoJSON, de
-modo que el proyecto no depende de internet. Los corredores de la Autopista Norte y la
-Autopista Sur son los tramos de esas rutas que recorren cada autopista. Límites: 50 km/h general (incluye autopistas, según la norma distrital), 30 km/h
-en zona escolar, y 20 km/h en el patio como **política interna** de la empresa.
+**Escenario Bogotá sobre datos reales.** Las tres rutas siguen la red vial real: se
+calcularon una vez con OSRM sobre OpenStreetMap (`scripts/fetch_osm_routes.py`). Las
+geocercas salen de datos abiertos oficiales (`scripts/fetch_bogota_open_data.py`). Ambos
+resultados se versionan como GeoJSON, así el proyecto no depende de internet y es
+reproducible.
+
+| Geocerca | Fuente | Construcción | Cantidad |
+|---|---|---|---:|
+| Perímetro urbano | POT, Secretaría Distrital de Planeación (CC BY 4.0) | Polígono oficial reproyectado desde el sistema local de Bogotá, simplificado a 10 m | 1 |
+| Zona escolar (30 km/h) | Colegios Bogotá D.C. 12/2025, Secretaría de Educación (CC BY-SA 4.0) | 100 m alrededor de cada sede, en EPSG:9377 | 2.209 |
+| Alta siniestralidad | Tramos y puntos críticos de vulnerables en vías arteriales 2022–2025, Oficina de Seguridad Vial, SDM (CC BY 4.0) | Polígono oficial del tramo; 100 m alrededor del punto | 44 |
+| Corredor vial | OpenStreetMap (ODbL) | Tramo de la ruta OSRM sobre cada autopista, 120–150 m de ancho | 2 |
+| Patio logístico | Ficticio (empresa simulada) | 250 m alrededor del origen de las rutas | 1 |
+
+Supuestos y descartes: no hay una capa pública de "entornos escolares", así que 100 m
+(la cuadra frente a la sede) es un supuesto documentado. Con 150 m, un tercio de la
+ruta por la Calle 26 quedaba a 30 km/h, algo irreal. De la fuente de colegios solo se
+conservan nombre, código DANE y sector, sin teléfonos ni correos. Se descartan dos sedes
+sin ubicación (coordenada centinela). No se usan las "zonas críticas en vías locales"
+de la SDM: son áreas de cientos de hectáreas definidas para la red local, y aplicarlas
+agravaría la severidad también en las arterias que las cruzan.
+
+Con ~2.250 geocercas, el índice GiST de `ref.geofence` sí trabaja: el enriquecimiento
+deja de poder recorrer todas las geocercas por cada punto (ver la sección 6).
+
+Límites: 50 km/h general (incluye autopistas, Ley 2251 de 2022), 30 km/h en zona
+escolar, y 20 km/h en el patio como **política interna** de la empresa.
 
 **Severidad** (`rules/speed.py`): se declara exceso solo por encima de
 `límite + tolerancia` (3 km/h, error típico del GPS). El exceso se mide contra el límite

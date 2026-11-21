@@ -9,14 +9,12 @@ from __future__ import annotations
 from collections import defaultdict
 
 import pytest
-from shapely.geometry import Point
 
 from simon_geo.domain import AlertType, ZoneType
 from simon_geo.parameters import PipelineParameters
 from simon_geo.processing.enrichment import EnrichmentResult, SilverEnricher
 from simon_geo.seed import bogota
 from simon_geo.simulator.fleet import FleetSimulator, SimulationConfig
-from simon_geo.spatial.crs import lonlat_to_metric
 from simon_geo.spatial.geofencing import GeofenceIndex, resolve_speed_limit
 from tests.conftest import T0
 
@@ -61,14 +59,37 @@ class TestBogotaSeed:
         codes = {g.code for g in INDEX.containing(*bogota.DEPOT_LONLAT)}
         assert {"BOG-URB", "BOG-PATIO-FONTIBON"} <= codes
 
-    def test_school_zone_limit(self) -> None:
-        d = resolve_speed_limit(INDEX.containing(*bogota.SCHOOL_LONLAT), 80)
+    def test_loads_real_open_data(self) -> None:
+        """Perímetro oficial, ~2.200 sedes escolares y los tramos/puntos críticos de la SDM."""
+        by_type = defaultdict(int)
+        for g in GEOFENCES.values():
+            by_type[g.zone_type] += 1
+        assert by_type[ZoneType.URBAN] == 1
+        assert by_type[ZoneType.SCHOOL] > 2000
+        assert by_type[ZoneType.HIGH_RISK] > 40
+        assert GEOFENCES["BOG-URB"].geometry.area > 0.025  # ~370 km² en grados²
+
+    def test_school_zone_limit_on_route(self) -> None:
+        r03 = next(r for r in bogota.routes() if r.code == "R03")
+        school = next(
+            g
+            for g in GEOFENCES.values()
+            if g.zone_type is ZoneType.SCHOOL and g.geometry.intersects(r03.geometry)
+        )
+        inside = school.geometry.intersection(r03.geometry)
+        piece = max(getattr(inside, "geoms", [inside]), key=lambda g: g.length)
+        point = piece.interpolate(0.5, normalized=True)  # mitad del tramo: lejos del borde
+        d = resolve_speed_limit(INDEX.containing(point.x, point.y), 80)
         assert d.limit_kmh == 30 and d.zone_type is ZoneType.SCHOOL
 
-    def test_high_risk_wins_over_highway_at_calle_80(self) -> None:
-        """Mismo límite (50), pero la zona que gobierna es la de alta siniestralidad,
-        por lo que un exceso ahí se califica con más severidad."""
-        d = resolve_speed_limit(INDEX.containing(*bogota.CALLE80_LONLAT), 80)
+    def test_official_critical_segment_wins_over_corridor(self) -> None:
+        """Mismo límite (50), pero dentro del tramo crítico oficial de la Autopista Sur
+        gobierna la alta siniestralidad, que agrava la severidad del exceso."""
+        overlap = GEOFENCES["SDM-TC-AUTOSUR"].geometry.intersection(
+            GEOFENCES["BOG-AUTOSUR"].geometry
+        )
+        point = overlap.representative_point()
+        d = resolve_speed_limit(INDEX.containing(point.x, point.y), 80)
         assert d.limit_kmh == 50 and d.zone_type is ZoneType.HIGH_RISK
 
     def test_bogota_legal_limits_are_50_or_30(self) -> None:
@@ -99,13 +120,10 @@ class TestBogotaSeed:
             inside = GEOFENCES[code].geometry.intersection(routes[route].geometry)
             assert inside.length > 0.02, code  # > ~2 km de ruta dentro del corredor
 
-    def test_landmarks_lie_on_their_routes(self) -> None:
-        routes = {r.code: r for r in bogota.routes()}
-        assert routes["R03"].remaining_km(*bogota.SCHOOL_LONLAT) < routes["R03"].length_km
-        assert (
-            routes["R01"].metric_geometry.distance(Point(lonlat_to_metric(*bogota.CALLE80_LONLAT)))
-            < 1.0
-        )
+    def test_every_route_crosses_real_school_zones(self) -> None:
+        schools = [g for g in GEOFENCES.values() if g.zone_type is ZoneType.SCHOOL]
+        for route in bogota.routes():
+            assert any(g.geometry.intersects(route.geometry) for g in schools), route.code
 
 
 class TestSimulator:
@@ -140,15 +158,17 @@ class TestEndToEnd:
         points = [p for p in result.points if p.vehicle_id == "VHC-8472-ABC"]
         assert not [p for p in points if p.is_harsh_event]
 
-    def test_aggressive_driver_speeds_in_autopista_sur(self, result) -> None:
+    def test_aggressive_driver_speeds_in_official_critical_zone(self, result) -> None:
         alerts = alerts_by_vehicle(result)["VHC-1935-BOG"]
-        autosur = GEOFENCES["BOG-AUTOSUR"].geofence_id
-        assert any(a.alert_type is AlertType.SPEEDING and a.geofence_id == autosur for a in alerts)
+        high_risk = {g.geofence_id for g in GEOFENCES.values() if g.zone_type is ZoneType.HIGH_RISK}
+        assert any(
+            a.alert_type is AlertType.SPEEDING and a.geofence_id in high_risk for a in alerts
+        )
 
     def test_school_zone_speeding_detected(self, result) -> None:
         alerts = alerts_by_vehicle(result)["VHC-5521-KLM"]
-        school = GEOFENCES["BOG-ESC-TEUSAQUILLO"].geofence_id
-        assert any(a.geofence_id == school for a in alerts)
+        schools = {g.geofence_id for g in GEOFENCES.values() if g.zone_type is ZoneType.SCHOOL}
+        assert any(a.geofence_id in schools for a in alerts)
 
     def test_low_fuel_vehicle_gets_predictive_alert(self, result) -> None:
         alerts = alerts_by_vehicle(result)["VHC-7310-TRZ"]

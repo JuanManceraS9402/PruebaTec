@@ -27,6 +27,7 @@ from simon_geo.dashboard.views import (
     build_legend,
     feature_collection,
     fleet_summary,
+    geofences_on_paths,
     legend_html,
     line_path,
     vehicle_label,
@@ -55,6 +56,13 @@ TOOLTIP = {
     "style": {"fontSize": "13px", "maxWidth": "320px"},
 }
 LOCAL_TZ = "America/Bogota"
+# Mapas base. La ortofoto es un estilo MapLibre servido por la propia app
+# (dashboard/static, ver .streamlit/config.toml) que pide teselas al ImageServer de
+# Catastro/IDECA con exportImage: no hace falta token ni copiar imágenes.
+BASEMAPS = {
+    "Mapa (CARTO)": "light",
+    "Ortofoto 2025 (IDECA)": "/app/static/ortofoto_bogota_2025.json",
+}
 
 st.set_page_config(page_title="Simón Geo · Flota", page_icon="🗺️", layout="wide")
 
@@ -246,16 +254,31 @@ def hotspot_layers(hotspots: pd.DataFrame) -> list[pdk.Layer]:
 
 
 # --------------------------------------------------------------------- UI
-def sidebar() -> tuple[DbRole, dict[str, bool]]:
+def sidebar() -> tuple[DbRole, dict[str, bool], str]:
     st.sidebar.title("Simón Geo")
     role = ROLES[st.sidebar.radio("Ver como", list(ROLES))]
     st.sidebar.caption(
         "El mismo tablero, dos usuarios de base de datos. El enmascaramiento ocurre en "
         "PostgreSQL (vistas `analytics.*`), no aquí."
     )
+    st.sidebar.subheader("Mapa base")
+    basemap = st.sidebar.radio(
+        "Mapa base",
+        list(BASEMAPS),
+        horizontal=True,
+        label_visibility="collapsed",
+        help="La ortofoto urbana 2025 se carga en vivo desde el servicio de imágenes de "
+        "Catastro Bogotá (IDECA); se ve a partir de zoom 10.",
+    )
     st.sidebar.subheader("Capas")
     layers = {
         "geofences": st.sidebar.checkbox("Geocercas", value=True),
+        "schools_on_route": st.sidebar.toggle(
+            "Zonas escolares: solo las de las rutas",
+            value=True,
+            help="Hay ~2.200 zonas escolares reales (una por sede, datos abiertos de "
+            "Bogotá). Apágalo para verlas todas.",
+        ),
         "tracks": st.sidebar.checkbox("Rutas del día", value=True),
         "heatmap": st.sidebar.checkbox("Mapa de calor de infracciones", value=True),
         "alerts": st.sidebar.checkbox("Puntos de infracción", value=True),
@@ -267,7 +290,7 @@ def sidebar() -> tuple[DbRole, dict[str, bool]]:
             "menor Driver Score).",
         ),
     }
-    return role, layers
+    return role, layers, BASEMAPS[basemap]
 
 
 def render_kpis(kpis: pd.DataFrame, alerts: pd.DataFrame) -> None:
@@ -283,7 +306,7 @@ def render_kpis(kpis: pd.DataFrame, alerts: pd.DataFrame) -> None:
 
 
 def main() -> None:
-    role, enabled = sidebar()
+    role, enabled, map_style = sidebar()
     try:
         days = load_days(role)
         geofences, hotspots, (db_user, is_admin) = load_static(role)
@@ -356,8 +379,13 @@ def main() -> None:
         if r.track_geojson
     ]
     layers = []
-    if enabled["geofences"] and len(geofences):
-        layers.append(geofence_layer(geofences))
+    shown_geofences = (
+        geofences_on_paths(geofences, (t["path"] for t in tracks))
+        if enabled["schools_on_route"]
+        else geofences
+    )
+    if enabled["geofences"] and len(shown_geofences):
+        layers.append(geofence_layer(shown_geofences))
     if enabled["hotspots"] and len(hotspots):
         layers.extend(hotspot_layers(hotspots))
     if enabled["heatmap"] and len(map_alerts):
@@ -376,7 +404,7 @@ def main() -> None:
                 initial_view_state=pdk.ViewState(**view),
                 tooltip=TOOLTIP,
                 map_provider="carto",
-                map_style="light",
+                map_style=map_style,
             ),
             height=560,
         )
@@ -384,7 +412,9 @@ def main() -> None:
         st.markdown("**Leyenda**")
         legend = build_legend(
             enabled,
-            zones=zip(geofences["zone_type"], geofences["speed_limit_kmh"], strict=True),
+            zones=zip(
+                shown_geofences["zone_type"], shown_geofences["speed_limit_kmh"], strict=True
+            ),
             tracks=((t["name"], t["color"][:3]) for t in tracks),
             severities=map_alerts["severity"],
         )

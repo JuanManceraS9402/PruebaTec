@@ -7,8 +7,10 @@ la enriquece con geocercas, genera alertas y expone KPIs de *Driver Score* para 
 
 * **Ingesta** idempotente por API (FastAPI), con **enmascaramiento de IDs** (`VHC-****-ABC`)
   aplicado en la base de datos según el rol de quien consulta.
-* **Geocercas** con `ST_Intersects` sobre índices **GiST**, verificadas contra un índice
-  R-tree en Python que da exactamente el mismo resultado.
+* **Geocercas reales de Bogotá** (2.257: perímetro urbano del POT, zonas escolares y
+  tramos críticos de siniestralidad de la Secretaría de Movilidad) con `ST_Intersects`
+  sobre índices **GiST**, verificadas contra un índice R-tree en Python que da
+  exactamente el mismo resultado.
 * **Alertas de velocidad** cuyo límite depende de la geocerca (zona escolar, alta
   siniestralidad, corredor, patio), con severidad escalada y **una alerta por episodio**.
 * **Combustible predictivo**: consumo real por regresión en ventana móvil, autonomía y
@@ -74,8 +76,9 @@ flowchart LR
 │   ├── simulator/              # Flota simulada (perfiles, ruido, duplicados, outliers)
 │   ├── seed/                   # Escenario Bogotá
 │   ├── benchmark/              # Generador masivo y lectura de planes EXPLAIN
-│   └── dashboard/              # Consultas y transformaciones del tablero
-├── dashboard/app.py            # Tablero Streamlit + pydeck
+│   └── dashboard/              # Consultas, gráficos y transformaciones del tablero
+├── dashboard/app.py            # Tablero Streamlit + pydeck (mapa base CARTO u ortofoto)
+├── scripts/                    # Descarga de rutas (OSRM) y geocercas (datos abiertos)
 ├── tests/
 │   ├── unit/                   # Sin base de datos
 │   └── integration/            # Contra PostGIS (docker compose)
@@ -113,5 +116,16 @@ Las pruebas cubren lo crítico del dominio:
 
 ---
 
-Rutas del escenario: datos © colaboradores de [OpenStreetMap](https://www.openstreetmap.org/copyright)
-(ODbL), calculadas con [OSRM](https://project-osrm.org/). Mapa base © CARTO.
+### Datos y créditos
+
+| Dato | Fuente | Licencia |
+|---|---|---|
+| Rutas y corredores | © colaboradores de [OpenStreetMap](https://www.openstreetmap.org/copyright), calculadas con [OSRM](https://project-osrm.org/) | ODbL |
+| Perímetro urbano (POT) | [Secretaría Distrital de Planeación](https://datosabiertos.bogota.gov.co/dataset/perimetro-urbano-bogota-d-c) | CC BY 4.0 |
+| Zonas escolares | [Colegios Bogotá D.C.](https://datosabiertos.bogota.gov.co/dataset/colegios-bogota-d-c), Secretaría de Educación del Distrito | CC BY-SA 4.0 |
+| Tramos y puntos críticos de siniestralidad 2022–2025 | [Oficina de Seguridad Vial, Secretaría Distrital de Movilidad](https://sig.simur.gov.co/arcgis/rest/services/DatosAbiertos) | CC BY 4.0 |
+| Ortofoto urbana 2025 | [Secretaría Distrital de Planeación, publicada por IDECA – UAECD](https://serviciosgis.catastrobogota.gov.co/image/rest/services/imagenesfunciones/orthourbana2025funcion/ImageServer) | Servicio público de IDECA |
+| Mapa base | © [CARTO](https://carto.com/attributions) | — |
+
+El patio logístico y la flota son ficticios. Las zonas escolares derivadas (100 m por sede)
+se distribuyen bajo CC BY-SA 4.0, como la fuente.

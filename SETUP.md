@@ -68,8 +68,18 @@ pip install -e ".[dev,dashboard]"
 python -m simon_geo.seed
 ```
 
-Carga 5 vehículos, 6 geocercas (perímetro urbano, corredores, alta siniestralidad,
-zona escolar y patio), 3 rutas y la asignación de ruta de cada vehículo. Es idempotente.
+Carga 5 vehículos, 2.257 geocercas reales (perímetro urbano del POT, 2.209 zonas
+escolares, 44 tramos y puntos críticos de siniestralidad de la Secretaría de Movilidad,
+corredores de OpenStreetMap y el patio), 3 rutas y la asignación de ruta de cada
+vehículo. Es idempotente.
+
+Los datos geográficos ya vienen versionados en `src/simon_geo/seed/data/`. Para
+regenerarlos desde las fuentes (requiere internet):
+
+```bash
+python scripts/fetch_osm_routes.py        # rutas y corredores (OSRM / OpenStreetMap)
+python scripts/fetch_bogota_open_data.py  # geocercas (datos abiertos de Bogotá)
+```
 
 ## 5. API de ingesta
 
@@ -110,8 +120,13 @@ streamlit run dashboard/app.py
 
 Abre <http://localhost:8501>. En la barra lateral, **Ver como** cambia el usuario de base
 de datos: como *Analista BI* los IDs salen enmascarados (`VHC-****-ABC`), y como
-*Administrador* salen reales. El mapa muestra las rutas del día, el mapa de calor y los
-puntos de infracción, las geocercas y la malla de 250 m de puntos calientes.
+*Administrador* salen reales. El mapa muestra las rutas del día, el mapa de calor, los
+puntos de infracción, las geocercas y las zonas calientes.
+
+**Mapa base:** CARTO o la **ortofoto urbana 2025** de Bogotá, que se carga en vivo desde
+el servicio de imágenes de Catastro (IDECA). Ejecuta Streamlit desde la raíz del
+repositorio: `.streamlit/config.toml` activa el servidor estático que entrega el estilo
+del mapa (`dashboard/static/`).
 
 ## 9. Benchmark (millones de puntos)
 

@@ -1,24 +1,32 @@
-"""Escenario de prueba en Bogotá D.C.
+"""Escenario de prueba en Bogotá D.C., sobre datos geográficos reales.
 
-Las rutas siguen la red vial real: se calcularon con OSRM sobre OpenStreetMap
-(``scripts/fetch_osm_routes.py``) y se versionan en ``data/bogota_osm.geojson``
-(datos © colaboradores de OpenStreetMap, ODbL). Los corredores de geocerca son
-los tramos de esas rutas que recorren la Autopista Norte y la Autopista Sur.
-El perímetro urbano y las zonas circulares siguen siendo aproximados (no son
-cartografía oficial).
+Geocercas (``data/bogota_open_data.geojson``, generado por
+``scripts/fetch_bogota_open_data.py`` desde datos abiertos de Bogotá):
+
+* Perímetro urbano oficial del POT — Secretaría Distrital de Planeación (CC BY 4.0).
+* Zonas escolares: 100 m alrededor de cada una de las ~2.200 sedes de
+  "Colegios Bogotá D.C." — Secretaría de Educación del Distrito (CC BY-SA 4.0).
+* Alta siniestralidad: tramos y puntos críticos de siniestralidad de actores
+  vulnerables en vías arteriales 2022–2025 — Oficina de Seguridad Vial,
+  Secretaría Distrital de Movilidad (CC BY 4.0).
+
+Rutas y corredores (``data/bogota_osm.geojson``): calculados con OSRM sobre la red
+vial de OpenStreetMap (© colaboradores de OpenStreetMap, ODbL).
+
+El único elemento ficticio es el patio logístico de la empresa simulada.
 
 Límites de velocidad de Bogotá: 50 km/h en toda la ciudad, incluidas autopistas
-y vías principales (Ley 2251 de 2022), y 30 km/h en zonas escolares. Las
-geocercas de corredor y de alta siniestralidad mantienen el límite de 50; su
-valor está en que identifican la zona, lo que permite agravar la severidad del
-exceso (ver ``rules.speed.ESCALATING_ZONES``) y analizar las infracciones por
-corredor en la capa Oro. El patio logístico usa 20 km/h, que es una política
-interna de la empresa y no un límite legal.
+y vías principales (Ley 2251 de 2022), y 30 km/h en zonas escolares. Los
+corredores y la alta siniestralidad mantienen 50: su valor está en que identifican
+la zona, lo que permite agravar la severidad del exceso (ver
+``rules.speed.ESCALATING_ZONES``) y analizar las infracciones por zona en la capa
+Oro. El patio usa 20 km/h, una política interna de la empresa. Fuera del
+perímetro (R02 llega a Soacha) aplica el límite por defecto de los parámetros.
 
 Rutas (todas salen del patio de Fontibón):
   R01  Fontibón → Calle 26 → Calle 80 → Autopista Norte (Portal Norte)
   R02  Fontibón → Av. Boyacá → Autopista Sur → Soacha (sale del perímetro)
-  R03  Fontibón → Calle 26 → Teusaquillo (zona escolar) → Centro
+  R03  Fontibón → Calle 26 → Teusaquillo → Centro
 """
 
 from __future__ import annotations
@@ -29,14 +37,15 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Final
 
-from shapely.geometry import LineString, Polygon, shape
+from shapely.geometry import LineString, shape
 
 from simon_geo.domain import Geofence, Vehicle, ZoneType
 from simon_geo.simulator.fleet import DRIVER_PROFILES, SimulatedVehicle
-from simon_geo.spatial.crs import circle, corridor, to_metric, to_wgs84
+from simon_geo.spatial.crs import circle, corridor
 from simon_geo.spatial.routes import PlannedRoute
 
 OSM_DATA: Final = Path(__file__).with_name("data") / "bogota_osm.geojson"
+OPEN_DATA: Final = Path(__file__).with_name("data") / "bogota_open_data.geojson"
 
 
 # ------------------------------------------------------------ datos de OSM
@@ -54,39 +63,26 @@ def _route_line(code: str) -> LineString:
     return _osm()[("route", code)]
 
 
-def _on_route(route_code: str, landmark: str) -> tuple[float, float]:
-    """Proyecta un punto de referencia sobre la ruta (en metros reales)."""
-    line = to_metric(_route_line(route_code))
-    point = to_metric(_osm()[("landmark", landmark)])
-    snapped = to_wgs84(line.interpolate(line.project(point)))
-    return round(snapped.x, 6), round(snapped.y, 6)
-
-
 # ---------------------------------------------------------------- geocercas
-_URBAN_PERIMETER = Polygon(
-    [
-        (-74.21, 4.60),
-        (-74.15, 4.53),
-        (-74.08, 4.53),
-        (-74.06, 4.60),
-        (-74.02, 4.68),
-        (-74.02, 4.82),
-        (-74.07, 4.83),
-        (-74.11, 4.75),
-        (-74.17, 4.70),
-        (-74.21, 4.64),
-    ]
-)
+_KIND_TO_ZONE: Final = {
+    "urban": (ZoneType.URBAN, 50),
+    "school": (ZoneType.SCHOOL, 30),
+    "high_risk": (ZoneType.HIGH_RISK, 50),
+}
 
 DEPOT_LONLAT: Final = _route_line("R01").coords[0]
-SCHOOL_LONLAT: Final = _on_route("R03", "PARKWAY")  # Park Way, Teusaquillo
-CALLE80_LONLAT: Final = _on_route("R01", "HEROES")  # Calle 80 con Autopista Norte
+
+
+@lru_cache(maxsize=1)
+def _open_data() -> tuple[tuple[dict[str, Any], Any], ...]:
+    data = json.loads(OPEN_DATA.read_text(encoding="utf-8"))
+    return tuple((f["properties"], shape(f["geometry"])) for f in data["features"])
 
 
 def geofences() -> list[Geofence]:
-    """Geocercas con IDs estables (se insertan en este orden en ``ref.geofence``)."""
-    return [
-        Geofence(1, "BOG-URB", "Perímetro urbano de Bogotá", ZoneType.URBAN, 50, _URBAN_PERIMETER),
+    """Geocercas con IDs estables (se insertan en este orden en ``ref.geofence``):
+    primero las del escenario y luego las de datos abiertos, en el orden del archivo."""
+    fences = [
         Geofence(
             2,
             "BOG-AUTONORTE",
@@ -97,37 +93,30 @@ def geofences() -> list[Geofence]:
         ),
         Geofence(
             3,
-            "BOG-CL80-AUTONORTE",
-            "Intersección Calle 80 - Autopista Norte (alta siniestralidad)",
-            ZoneType.HIGH_RISK,
-            50,
-            circle(*CALLE80_LONLAT, radius_m=350),
-        ),
-        Geofence(
-            4,
             "BOG-AUTOSUR",
-            "Corredor Autopista Sur (alta siniestralidad)",
-            ZoneType.HIGH_RISK,
+            "Corredor Autopista Sur",
+            ZoneType.HIGHWAY,
             50,
             corridor(_osm()[("corridor", "AUTOSUR")].coords, half_width_m=150),
         ),
         Geofence(
-            5,
-            "BOG-ESC-TEUSAQUILLO",
-            "Zona escolar Teusaquillo",
-            ZoneType.SCHOOL,
-            30,
-            circle(*SCHOOL_LONLAT, radius_m=300),
-        ),
-        Geofence(
-            6,
+            4,
             "BOG-PATIO-FONTIBON",
-            "Patio logístico Fontibón",
+            "Patio logístico Fontibón (ficticio)",
             ZoneType.DEPOT,
             20,
             circle(*DEPOT_LONLAT, radius_m=250),
         ),
     ]
+    next_id = 5
+    for props, geom in _open_data():
+        zone_type, limit = _KIND_TO_ZONE[props["kind"]]
+        if props["kind"] == "urban":
+            fences.append(Geofence(1, props["code"], props["name"], zone_type, limit, geom))
+            continue
+        fences.append(Geofence(next_id, props["code"], props["name"], zone_type, limit, geom))
+        next_id += 1
+    return sorted(fences, key=lambda g: g.geofence_id)
 
 
 def routes() -> list[PlannedRoute]:

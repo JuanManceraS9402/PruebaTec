@@ -1,0 +1,6 @@
+[server]
+# Sirve dashboard/static/ en /app/static/: el estilo del mapa base de la ortofoto
+enableStaticServing = true
+
+[browser]
+gatherUsageStats = false

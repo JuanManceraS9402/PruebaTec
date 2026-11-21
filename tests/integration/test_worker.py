@@ -123,7 +123,7 @@ def test_each_scenario_vehicle_triggers_its_rule(processed, conn) -> None:
     assert {("SPEEDING", "HIGH"), ("SPEEDING", "CRITICAL")} <= by_vehicle["VHC-1935-BOG"]
     assert ("LOW_FUEL_RANGE", "CRITICAL") in by_vehicle["VHC-7310-TRZ"]
     school = {code for v, _, t, _, code in alerts if v == "VHC-5521-KLM" and t == "SPEEDING"}
-    assert any(code and code.startswith("BOG-ESC") for code in school), school
+    assert any(code and code.startswith("ESC-") for code in school), school
 
 
 def test_refuel_detected_in_silver(processed, conn) -> None:
