@@ -23,6 +23,7 @@ from simon_geo.dashboard.views import (
     HOTSPOT_COLOR,
     SEVERITY_COLORS,
     ZONE_COLORS,
+    ZONE_LABELS,
     build_legend,
     feature_collection,
     fleet_summary,
@@ -44,6 +45,14 @@ TRACK_COLORS = [
 ]
 SEVERITY_WEIGHT = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
 CACHE_TTL_S = 30
+ALERT_LABELS = {"SPEEDING": "Exceso de velocidad", "LOW_FUEL_RANGE": "Combustible insuficiente"}
+SEVERITY_SHORT = {"LOW": "baja", "MEDIUM": "media", "HIGH": "alta", "CRITICAL": "crítica"}
+# La estructura va en la plantilla y los datos como texto plano: deck.gl escapa los
+# valores que interpola, así que un <b> dentro del dato se vería literal.
+TOOLTIP = {
+    "html": "<b>{title}</b><div style='white-space:pre-line;margin-top:2px'>{body}</div>",
+    "style": {"fontSize": "13px", "maxWidth": "320px"},
+}
 LOCAL_TZ = "America/Bogota"
 
 st.set_page_config(page_title="Simón Geo · Flota", page_icon="🗺️", layout="wide")
@@ -95,7 +104,8 @@ def geofence_layer(geofences: pd.DataFrame) -> pdk.Layer:
         p = f["properties"]
         p["fill"] = list(ZONE_COLORS.get(p["zone_type"], [150, 150, 150, 40]))
         limit = f"{p['speed_limit_kmh']} km/h" if p["speed_limit_kmh"] else "sin límite"
-        f["tooltip"] = f"<b>{p['name']}</b><br>{p['zone_type']} · {limit}"
+        f["title"] = p["name"]
+        f["body"] = f"{ZONE_LABELS.get(p['zone_type'], p['zone_type'])} · {limit}"
     return pdk.Layer(
         "GeoJsonLayer",
         fc,
@@ -135,18 +145,32 @@ def heatmap_layer(alerts: pd.DataFrame) -> pdk.Layer:
     )
 
 
+def unit(alert_type: str) -> str:
+    return " km/h" if alert_type == "SPEEDING" else ""
+
+
 def alert_layer(alerts: pd.DataFrame) -> pdk.Layer:
     colored = with_colors(alerts, "severity", SEVERITY_COLORS)
-    colored["tooltip"] = [
-        f"<b>{r.alert_type} · {r.severity}</b><br>{vehicle_label(r.vehicle_id, r.vehicle_key)}"
-        f"<br>{r.event_ts:%H:%M:%S}<br>{r.geofence_name or 'Fuera de geocerca'}"
-        f"<br>observado {r.observed_value} / umbral {r.threshold_value}"
+    colored["title"] = [
+        f"{ALERT_LABELS.get(r.alert_type, r.alert_type)} · "
+        f"severidad {SEVERITY_SHORT.get(r.severity, r.severity)}"
+        for r in colored.itertuples()
+    ]
+    colored["body"] = [
+        "\n".join(
+            (
+                vehicle_label(r.vehicle_id, r.vehicle_key),
+                f"{r.event_ts:%H:%M:%S} · {r.geofence_name or 'Fuera de geocerca'}",
+                f"Observado {r.observed_value}{unit(r.alert_type)} · "
+                f"umbral {r.threshold_value}{unit(r.alert_type)}",
+            )
+        )
         for r in colored.itertuples()
     ]
     colored["event_ts"] = colored["event_ts"].astype(str)
     return pdk.Layer(
         "ScatterplotLayer",
-        colored[["lon", "lat", "color", "tooltip"]],
+        colored[["lon", "lat", "color", "title", "body"]],
         id="alerts",
         get_position=["lon", "lat"],
         get_fill_color="color",
@@ -170,10 +194,10 @@ def hotspot_layers(hotspots: pd.DataFrame) -> list[pdk.Layer]:
     for f in fc["features"]:
         p = f["properties"]
         p["fill"] = [*HOTSPOT_COLOR, int(40 + 110 * p["infractions"] / peak)]
-        f["tooltip"] = (
-            f"<b>Zona caliente #{p['hotspot_rank']}</b><br>{p['infractions']} excesos "
-            f"({p['severe_infractions']} graves) · {p['vehicles']} vehículo(s)"
-            f"<br>{p['area_km2']} km² · histórico acumulado"
+        f["title"] = f"Zona caliente #{p['hotspot_rank']}"
+        f["body"] = (
+            f"{p['infractions']} excesos ({p['severe_infractions']} graves) · "
+            f"{p['vehicles']} vehículo(s)\n{p['area_km2']} km² · histórico acumulado"
         )
     labels = [
         {"position": [r["label_lon"], r["label_lat"]], "text": f"#{r['hotspot_rank']}"}
@@ -275,8 +299,8 @@ def main() -> None:
             "name": vehicle_label(r.vehicle_id, r.vehicle_key),
             "path": line_path(r.track_geojson),
             "color": TRACK_COLORS[i % len(TRACK_COLORS)],
-            "tooltip": f"<b>{vehicle_label(r.vehicle_id, r.vehicle_key)}</b>"
-            f"<br>{r.distance_km} km · score {r.driver_score}",
+            "title": vehicle_label(r.vehicle_id, r.vehicle_key),
+            "body": f"{r.distance_km} km recorridos · Driver Score {r.driver_score}",
         }
         for i, r in enumerate(kpis.itertuples())
         if r.track_geojson
@@ -300,7 +324,7 @@ def main() -> None:
             pdk.Deck(
                 layers=layers,
                 initial_view_state=pdk.ViewState(**view),
-                tooltip={"html": "{tooltip}"},
+                tooltip=TOOLTIP,
                 map_provider="carto",
                 map_style="light",
             ),
