@@ -16,7 +16,7 @@ htmlcov/
 
 # Entorno y datos locales
 .env
-data/
+/data/
 *.log
 
 # Editores / SO
