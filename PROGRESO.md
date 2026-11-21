@@ -22,7 +22,8 @@
 
 ## 2. Restricciones del PC anterior
 
-> **PC nuevo (2026-11-20):** tampoco tiene Docker. El repo ya está en GitHub
+> **PC nuevo (2026-11-20):** tampoco tiene Docker (el usuario lo está instalando).
+> **La CI ya pasó en verde, incluida la integración**: el SQL de `db/init` funciona en PostGIS real. El repo ya está en GitHub
 > (`JuanManceraS9402/PruebaTec`) y la CI es la que ejecuta el SQL contra PostGIS.
 
 - No se podía instalar nada: **no había Docker ni PostgreSQL**. Por eso **el SQL nunca se ha ejecutado**.
@@ -134,7 +135,7 @@ REQUIRE_DB=1 pytest -m integration -v
    - generador masivo (millones de filas) que cargue con `COPY`;
    - `EXPLAIN (ANALYZE, BUFFERS)` de consultas típicas (puntos en geocerca, ventana temporal y vehículo, heatmap), comparando sin y con índices GiST/BRIN y la poda de particiones;
    - guardar los resultados en `docs/benchmark.md`.
-3. **DESIGN.md**: arquitectura de capas, modelo de datos, decisiones y trade-offs. Temas a cubrir:
+3. ~~DESIGN.md~~ **HECHO** (2026-11-20; falta enlazar números reales de `docs/benchmark.md`). Era: arquitectura de capas, modelo de datos, decisiones y trade-offs. Temas a cubrir:
    - por qué se particiona por día;
    - por qué EPSG:9377;
    - Python y PostGIS para las geocercas;
