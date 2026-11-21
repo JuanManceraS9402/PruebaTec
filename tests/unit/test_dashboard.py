@@ -12,9 +12,12 @@ import pytest
 
 from simon_geo.dashboard.views import (
     BOGOTA_VIEW,
+    HEATMAP_COLORS,
     SEVERITY_COLORS,
+    build_legend,
     feature_collection,
     fleet_summary,
+    legend_html,
     line_path,
     vehicle_label,
     view_for,
@@ -126,3 +129,59 @@ def test_app_starts_without_crashing(monkeypatch) -> None:
         get_settings.cache_clear()
     assert not at.exception
     assert any("PostGIS" in e.value for e in at.error)
+
+
+class TestLegend:
+    ALL_ON = {"geofences": True, "tracks": True, "heatmap": True, "alerts": True, "grid": True}
+    ZONES = [("URBAN", 50), ("SCHOOL", 30), ("HIGHWAY", 50), ("HIGH_RISK", 50), ("DEPOT", 20)]
+
+    def legend(self, enabled=None, **kw):
+        defaults = {
+            "zones": self.ZONES,
+            "tracks": [("VHC-****-ABC · VK-1", [0, 114, 178])],
+            "severities": ["HIGH", "LOW"],
+        }
+        return build_legend(enabled or self.ALL_ON, **{**defaults, **kw})
+
+    def test_only_enabled_layers_appear(self) -> None:
+        titles = [s.title for s in self.legend({"alerts": True, "geofences": True})]
+        assert titles == ["Puntos de infracción", "Geocercas"]
+
+    def test_sections_follow_map_stacking_order(self) -> None:
+        titles = [s.title for s in self.legend()]
+        assert titles == [
+            "Puntos de infracción",
+            "Rutas del día",
+            "Mapa de calor",
+            "Puntos calientes (malla 250 m)",
+            "Geocercas",
+        ]
+
+    def test_severities_only_those_present_in_order(self) -> None:
+        alerts = self.legend({"alerts": True})[0]
+        assert [i.label.split(" ")[0] for i in alerts.items] == ["Baja", "Alta"]
+        assert alerts.items[1].colors[0] == list(SEVERITY_COLORS["HIGH"])
+
+    def test_geofences_show_limits_by_priority(self) -> None:
+        zones = self.legend({"geofences": True})[0]
+        assert [i.label for i in zones.items] == [
+            "Zona escolar · 30 km/h",
+            "Alta siniestralidad · 50 km/h",
+            "Patio logístico · 20 km/h",
+            "Corredor vial · 50 km/h",
+            "Perímetro urbano · 50 km/h",
+        ]
+
+    def test_no_alerts_hides_alert_and_heatmap_sections(self) -> None:
+        titles = [s.title for s in self.legend(severities=[])]
+        assert "Puntos de infracción" not in titles and "Mapa de calor" not in titles
+
+    def test_heatmap_ramp_matches_layer_colors(self) -> None:
+        heat = next(s for s in self.legend() if s.title == "Mapa de calor")
+        assert heat.items[0].colors == HEATMAP_COLORS
+
+    def test_html_escapes_and_renders(self) -> None:
+        out = legend_html(self.legend(tracks=[("<script>x</script>", [1, 2, 3])]))
+        assert "<script>" not in out and "&lt;script&gt;" in out
+        assert "linear-gradient" in out  # rampa del mapa de calor
+        assert legend_html([]).count("No hay capas") == 1

@@ -19,10 +19,13 @@ import streamlit as st
 from simon_geo.config import DbRole, get_settings
 from simon_geo.dashboard import data
 from simon_geo.dashboard.views import (
+    HEATMAP_COLORS,
     SEVERITY_COLORS,
     ZONE_COLORS,
+    build_legend,
     feature_collection,
     fleet_summary,
+    legend_html,
     line_path,
     vehicle_label,
     view_for,
@@ -52,8 +55,11 @@ def connection(role: DbRole) -> psycopg.Connection:
 
 
 def conn_for(role: DbRole) -> psycopg.Connection:
+    """Conexión cacheada, verificada antes de usarla: si la base se reinició, se reabre."""
     conn = connection(role)
-    if conn.closed or conn.broken:
+    try:
+        conn.execute("SELECT 1")
+    except psycopg.Error:
         connection.clear()
         conn = connection(role)
     return conn
@@ -124,6 +130,7 @@ def heatmap_layer(alerts: pd.DataFrame) -> pdk.Layer:
         get_weight="weight",
         radius_pixels=40,
         opacity=0.6,
+        color_range=[list(c) for c in HEATMAP_COLORS],
     )
 
 
@@ -215,8 +222,9 @@ def main() -> None:
         geofences, grid, (db_user, is_admin) = load_static(role)
     except psycopg.OperationalError as exc:
         st.error(
-            "No hay conexión con PostGIS. Levanta la base con `docker compose up -d --wait` "
-            f"y procesa datos con `python -m simon_geo.processing`.\n\n`{exc}`"
+            "No hay conexión con PostGIS. Levanta la base (`docker compose up -d --wait`, o "
+            "sin Docker `python -m simon_geo.bootstrap`) y procesa datos con "
+            f"`python -m simon_geo.processing`.\n\n`{exc}`"
         )
         st.stop()
 
@@ -263,16 +271,27 @@ def main() -> None:
         layers.append(alert_layer(alerts))
 
     view = view_for((t["path"] for t in tracks), alerts)
-    st.pydeck_chart(
-        pdk.Deck(
-            layers=layers,
-            initial_view_state=pdk.ViewState(**view),
-            tooltip={"html": "{tooltip}"},
-            map_provider="carto",
-            map_style="light",
-        ),
-        height=560,
-    )
+    map_col, legend_col = st.columns([4, 1])
+    with map_col:
+        st.pydeck_chart(
+            pdk.Deck(
+                layers=layers,
+                initial_view_state=pdk.ViewState(**view),
+                tooltip={"html": "{tooltip}"},
+                map_provider="carto",
+                map_style="light",
+            ),
+            height=560,
+        )
+    with legend_col:
+        st.markdown("**Leyenda**")
+        legend = build_legend(
+            enabled,
+            zones=zip(geofences["zone_type"], geofences["speed_limit_kmh"], strict=True),
+            tracks=((t["name"], t["color"]) for t in tracks),
+            severities=alerts["severity"],
+        )
+        st.html(legend_html(legend))
 
     left, right = st.columns([3, 2])
     with left:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 import math
 from collections.abc import Iterable, Mapping
@@ -130,3 +131,163 @@ def view_for(paths: Iterable[list[list[float]]], points: pd.DataFrame) -> dict[s
         "latitude": sum(lats) / len(lats),
         "zoom": 12,
     }
+
+
+# -------------------------------------------------------------------- leyenda
+ZONE_LABELS: Final[Mapping[str, str]] = {
+    "SCHOOL": "Zona escolar",
+    "RESTRICTED": "Zona restringida",
+    "HIGH_RISK": "Alta siniestralidad",
+    "DEPOT": "Patio logístico",
+    "HIGHWAY": "Corredor vial",
+    "URBAN": "Perímetro urbano",
+}
+SEVERITY_LABELS: Final[Mapping[str, str]] = {
+    "LOW": "Baja (exceso < 10 km/h)",
+    "MEDIUM": "Media (10–20 km/h)",
+    "HIGH": "Alta (20–30 km/h)",
+    "CRITICAL": "Crítica (≥ 30 km/h o sin combustible para la ruta)",
+}
+# Rampa del mapa de calor (de menor a mayor concentración); se pasa también a la capa
+HEATMAP_COLORS: Final[tuple[RGBA, ...]] = (
+    [255, 255, 178],
+    [254, 217, 118],
+    [254, 178, 76],
+    [253, 141, 60],
+    [240, 59, 32],
+    [189, 0, 38],
+)
+GRID_COLOR: Final[RGBA] = [230, 57, 70]
+
+
+@dataclass(frozen=True, slots=True)
+class LegendItem:
+    label: str
+    colors: tuple[RGBA, ...]  # uno, o varios para una rampa
+    shape: str  # "area" | "line" | "dot" | "ramp"
+
+
+@dataclass(frozen=True, slots=True)
+class LegendSection:
+    title: str
+    items: tuple[LegendItem, ...]
+    note: str = ""
+
+
+def build_legend(
+    enabled: Mapping[str, bool],
+    *,
+    zones: Iterable[tuple[str, int | None]] = (),
+    tracks: Iterable[tuple[str, RGBA]] = (),
+    severities: Iterable[str] = (),
+) -> list[LegendSection]:
+    """Secciones de leyenda solo para las capas encendidas, en el orden en que se apilan
+    en el mapa (la de arriba primero). Solo lista los valores presentes en los datos."""
+    sections: list[LegendSection] = []
+    present = set(severities)
+    if enabled.get("alerts") and present:
+        sections.append(
+            LegendSection(
+                "Puntos de infracción",
+                tuple(
+                    LegendItem(SEVERITY_LABELS[s], (list(SEVERITY_COLORS[s]),), "dot")
+                    for s in SEVERITY_COLORS
+                    if s in present
+                ),
+                "Una alerta por episodio; color = severidad.",
+            )
+        )
+    track_items = tuple(LegendItem(name, (list(color),), "line") for name, color in tracks)
+    if enabled.get("tracks") and track_items:
+        sections.append(LegendSection("Rutas del día", track_items))
+    if enabled.get("heatmap") and present:
+        sections.append(
+            LegendSection(
+                "Mapa de calor",
+                (LegendItem("menos → más infracciones", HEATMAP_COLORS, "ramp"),),
+                "Ponderado por severidad.",
+            )
+        )
+    if enabled.get("grid"):
+        sections.append(
+            LegendSection(
+                "Puntos calientes (malla 250 m)",
+                (
+                    LegendItem(
+                        "pocas → muchas infracciones",
+                        ([*GRID_COLOR, 60], [*GRID_COLOR, 230]),
+                        "ramp",
+                    ),
+                ),
+                "Histórico acumulado, celdas de 250 m × 250 m.",
+            )
+        )
+    limits: dict[str, set[int]] = {}
+    for zone_type, limit in zones:
+        limits.setdefault(zone_type, set())
+        if limit is not None:
+            limits[zone_type].add(int(limit))
+    if enabled.get("geofences") and limits:
+        items = []
+        for zone_type in ZONE_LABELS:
+            if zone_type not in limits:
+                continue
+            kmh = "/".join(str(v) for v in sorted(limits[zone_type]))
+            label = ZONE_LABELS[zone_type] + (f" · {kmh} km/h" if kmh else "")
+            r, g, b, a = ZONE_COLORS.get(zone_type, _FALLBACK)
+            # en la leyenda el relleno se ve más opaco que en el mapa para que se distinga
+            items.append(LegendItem(label, ([r, g, b, max(a, 110)],), "area"))
+        sections.append(LegendSection("Geocercas", tuple(items), "Límite de velocidad aplicado."))
+    return sections
+
+
+def _css(color: RGBA) -> str:
+    r, g, b, *rest = color
+    alpha = rest[0] / 255 if rest else 1.0
+    return f"rgba({r},{g},{b},{alpha:.2f})"
+
+
+def _swatch(item: LegendItem) -> str:
+    if item.shape == "ramp":
+        stops = ",".join(_css(c) for c in item.colors)
+        style = (
+            f"width:56px;height:10px;border-radius:3px;background:linear-gradient(90deg,{stops})"
+        )
+    elif item.shape == "line":
+        style = f"width:22px;height:0;border-top:4px solid {_css(item.colors[0])};border-radius:2px"
+    elif item.shape == "dot":
+        style = (
+            f"width:11px;height:11px;border-radius:50%;background:{_css(item.colors[0])};"
+            "border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)"
+        )
+    else:  # area
+        style = (
+            f"width:16px;height:12px;background:{_css(item.colors[0])};"
+            "border:1px solid rgba(60,60,60,.6)"
+        )
+    return f'<span style="display:inline-block;flex:none;{style}"></span>'
+
+
+_NOTE_STYLE: Final = "opacity:.65;font-size:.78em;margin-top:2px"
+
+
+def legend_html(sections: Iterable[LegendSection]) -> str:
+    """Leyenda en HTML autocontenido (los textos se escapan)."""
+    blocks = []
+    for section in sections:
+        rows = "".join(
+            '<div style="display:flex;align-items:center;gap:8px;margin:3px 0">'
+            f"{_swatch(item)}<span>{html.escape(item.label)}</span></div>"
+            for item in section.items
+        )
+        note = (
+            f'<div style="{_NOTE_STYLE}">{html.escape(section.note)}</div>' if section.note else ""
+        )
+        blocks.append(
+            '<div style="margin-bottom:12px">'
+            f'<div style="font-weight:600;margin-bottom:4px">{html.escape(section.title)}</div>'
+            f"{rows}{note}</div>"
+        )
+    if not blocks:
+        return '<div style="opacity:.6">No hay capas encendidas.</div>'
+    return '<div style="font-size:.85em;line-height:1.25">' + "".join(blocks) + "</div>"
