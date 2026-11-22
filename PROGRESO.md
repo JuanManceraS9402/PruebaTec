@@ -28,7 +28,7 @@
 | Tablero Streamlit | Mapa (capas, leyenda, ortofoto IDECA híbrida), BI interactivo (ranking clicable, perfil del vehículo, infracciones por zona y en el tiempo), filtro de placas con un clic, créditos al pie |
 | Simulador en el tablero | Solo administrador: ruta existente o dos clics en un mapa (OSRM), pipeline real, limpieza con **Borrar simulados** (`sandbox.py`, `routing.py`, `08_sandbox.sql`) |
 | Docs | `README.md`, `DESIGN.md`, `SETUP.md` y `docs/benchmark.md` al día, con fuentes y licencias |
-| Pruebas | 229 unitarias y 54 de integración. La CI corre las dos contra PostGIS real |
+| Pruebas | 232 unitarias y 60 de integración. La CI corre las dos contra PostGIS real |
 
 ## 3. Cómo levantar todo (este PC, sin Docker)
 
@@ -77,13 +77,15 @@ streamlit run dashboard/app.py                 # DESDE LA RAÍZ (lee .streamlit/
   |---|---|---|
   | Zona escolar en un día (GiST de puntos) | 0,2 ms | 97 ms |
   | Enriquecimiento de una hora (GiST de geocercas) | 1,05 s | 15,7 s |
+  | Oro: KPIs y rutas de 500 vehículos (optimizado) | 27 ms | antes 151 ms |
+  | Oro: infracciones en un recuadro del mapa (optimizado) | 2 ms | antes 72 ms |
   | Tamaño del índice de tiempo | BRIN: 224 KB | B-tree: 35 MB |
 
 - **Contraste para la demo:** VHC-6194-PLM (agresivo por Américas y NQS) frente a VHC-9053-HRD (cumplido, 100).
 
 ## 6. Pendiente para entregar
 
-0. **Pulsar Borrar simulados** antes de grabar: hay 4 vehículos de prueba en la base local.
+0. **Preparar la grabación** con `preparar_video.ps1` (local): deja la base limpia y levanta API y tablero.
 
 1. **Grabar el video** siguiendo `GUION_VIDEO.md`. Es local y está en `.gitignore`; tiene la sección de capas y una tabla de referencia rápida.
 2. **Subir el video** como no listado y poner el enlace en el README.

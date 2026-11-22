@@ -60,7 +60,10 @@ VALUES ('pseudonym_salt', gen_random_uuid()::text);
 
 CREATE TABLE security.vehicle_pseudonym (
   vehicle_id  text PRIMARY KEY REFERENCES ref.vehicle ON DELETE CASCADE,
-  vehicle_key text NOT NULL UNIQUE
+  vehicle_key text NOT NULL UNIQUE,
+  -- Precalculado: enmascarar con la expresión regular en cada fila dominaba el
+  -- tiempo de las consultas de BI (155 de 158 ms en 18.000 infracciones).
+  masked_id   text NOT NULL
 );
 
 CREATE OR REPLACE FUNCTION security.compute_vehicle_key(p_vehicle_id text)
@@ -85,8 +88,9 @@ SECURITY DEFINER
 SET search_path = pg_catalog
 AS $$
 BEGIN
-  INSERT INTO security.vehicle_pseudonym (vehicle_id, vehicle_key)
-  VALUES (NEW.vehicle_id, security.compute_vehicle_key(NEW.vehicle_id))
+  INSERT INTO security.vehicle_pseudonym (vehicle_id, vehicle_key, masked_id)
+  VALUES (NEW.vehicle_id, security.compute_vehicle_key(NEW.vehicle_id),
+          security.mask_vehicle_id(NEW.vehicle_id))
   ON CONFLICT (vehicle_id) DO NOTHING;
   RETURN NEW;
 END;
@@ -104,7 +108,7 @@ CREATE TRIGGER vehicle_pseudonym_ai
 CREATE VIEW analytics.telemetry_raw WITH (security_barrier = true) AS
 SELECT
   CASE WHEN ctx.is_admin THEN t.vehicle_id
-       ELSE security.mask_vehicle_id(t.vehicle_id) END AS vehicle_id,
+       ELSE coalesce(vp.masked_id, security.mask_vehicle_id(t.vehicle_id)) END AS vehicle_id,
   vp.vehicle_key,
   t.event_ts,
   t.lat,
@@ -120,7 +124,7 @@ LEFT JOIN security.vehicle_pseudonym vp ON vp.vehicle_id = t.vehicle_id;
 CREATE VIEW analytics.telemetry_enriched WITH (security_barrier = true) AS
 SELECT
   CASE WHEN ctx.is_admin THEN t.vehicle_id
-       ELSE security.mask_vehicle_id(t.vehicle_id) END AS vehicle_id,
+       ELSE coalesce(vp.masked_id, security.mask_vehicle_id(t.vehicle_id)) END AS vehicle_id,
   vp.vehicle_key,
   t.event_ts,
   t.geom,
@@ -146,7 +150,7 @@ CREATE VIEW analytics.alert WITH (security_barrier = true) AS
 SELECT
   a.alert_id,
   CASE WHEN ctx.is_admin THEN a.vehicle_id
-       ELSE security.mask_vehicle_id(a.vehicle_id) END AS vehicle_id,
+       ELSE coalesce(vp.masked_id, security.mask_vehicle_id(a.vehicle_id)) END AS vehicle_id,
   vp.vehicle_key,
   a.event_ts,
   a.alert_type,
@@ -163,7 +167,7 @@ LEFT JOIN security.vehicle_pseudonym vp ON vp.vehicle_id = a.vehicle_id;
 CREATE VIEW analytics.vehicle_daily_kpi WITH (security_barrier = true) AS
 SELECT
   CASE WHEN ctx.is_admin THEN k.vehicle_id
-       ELSE security.mask_vehicle_id(k.vehicle_id) END AS vehicle_id,
+       ELSE coalesce(vp.masked_id, security.mask_vehicle_id(k.vehicle_id)) END AS vehicle_id,
   vp.vehicle_key,
   k.local_day,
   k.points,
@@ -182,7 +186,8 @@ SELECT
   k.consumption_l_100km,
   k.low_fuel_risk_points,
   k.driver_score,
-  k.track_geom
+  k.track_geom,
+  k.track_map
 FROM gold.vehicle_daily_kpi k
 CROSS JOIN (SELECT security.is_admin() AS is_admin) ctx
 LEFT JOIN security.vehicle_pseudonym vp ON vp.vehicle_id = k.vehicle_id;
@@ -191,7 +196,7 @@ CREATE VIEW analytics.infraction_point WITH (security_barrier = true) AS
 SELECT
   p.alert_id,
   CASE WHEN ctx.is_admin THEN p.vehicle_id
-       ELSE security.mask_vehicle_id(p.vehicle_id) END AS vehicle_id,
+       ELSE coalesce(vp.masked_id, security.mask_vehicle_id(p.vehicle_id)) END AS vehicle_id,
   vp.vehicle_key,
   p.event_ts,
   p.local_day,
@@ -213,6 +218,23 @@ SELECT * FROM gold.infraction_grid_250m;
 
 CREATE VIEW analytics.infraction_hotspot AS
 SELECT * FROM gold.infraction_hotspot;
+
+-- Capa del mapa, SIN identificadores de vehículo (solo el seudónimo). Al no tener nada
+-- que enmascarar no necesita security_barrier, y por eso un filtro espacial (&&) llega
+-- al índice GiST: PostgreSQL no empuja operadores no leakproof a través de una barrera.
+CREATE VIEW analytics.infraction_map AS
+SELECT
+  p.alert_id,
+  vp.vehicle_key,
+  p.event_ts,
+  p.local_day,
+  p.alert_type,
+  p.severity,
+  p.geofence_name,
+  p.zone_type,
+  p.geom
+FROM gold.infraction_point p
+LEFT JOIN security.vehicle_pseudonym vp ON vp.vehicle_id = p.vehicle_id;
 
 CREATE VIEW analytics.geofence AS
 SELECT geofence_id, code, name, zone_type, speed_limit_kmh, geom

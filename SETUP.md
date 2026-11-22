@@ -157,6 +157,13 @@ Genera los datos en un esquema aparte (`bench`), con las mismas particiones e í
 Bronce, y escribe `docs/benchmark.md` con los tiempos y planes de `EXPLAIN ANALYZE`. Para
 borrar esos datos: `python -m simon_geo.benchmark --drop`.
 
+Para medir la capa Oro con las consultas reales del tablero:
+
+```bash
+python -m simon_geo.benchmark.gold         # ~1 minuto, escribe docs/benchmark_gold.md
+python -m simon_geo.benchmark.gold --drop  # borra el esquema bench_gold
+```
+
 ## 10. Pruebas
 
 ```bash

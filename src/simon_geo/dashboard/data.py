@@ -21,7 +21,7 @@ _DAILY_KPI: Final = """
 SELECT vehicle_id, vehicle_key, points, distance_km, avg_moving_speed_kmh, max_speed_kmh,
        speeding_time_pct, max_excess_kmh, harsh_events, refuels, fuel_used_l,
        consumption_l_100km, low_fuel_risk_points, driver_score,
-       ST_AsGeoJSON(track_geom, 6) AS track_geojson
+       ST_AsGeoJSON(track_map, 5) AS track_geojson
 FROM analytics.vehicle_daily_kpi
 WHERE local_day = %(day)s
 ORDER BY driver_score ASC NULLS LAST, vehicle_key
@@ -64,6 +64,14 @@ WHERE vehicle_key = %(vehicle_key)s
 ORDER BY event_ts
 """
 
+# Por analytics.infraction_map: sin IDs, así el filtro espacial sí usa el índice GiST
+_INFRACTIONS_IN_BBOX: Final = """
+SELECT vehicle_key, event_ts, severity::text AS severity, ST_X(geom) AS lon, ST_Y(geom) AS lat
+FROM analytics.infraction_map
+WHERE local_day = %(day)s
+  AND geom && ST_MakeEnvelope(%(west)s, %(south)s, %(east)s, %(north)s, 4326)
+"""
+
 _SANDBOX_KEYS: Final = "SELECT vehicle_key FROM analytics.sandbox_vehicle"
 
 _VEHICLE_KEY: Final = """
@@ -91,6 +99,14 @@ def daily_kpis(conn: psycopg.Connection, day: date) -> pd.DataFrame:
 
 def infractions(conn: psycopg.Connection, day: date) -> pd.DataFrame:
     return _frame(conn, _INFRACTIONS, {"day": day})
+
+
+def infractions_in_bbox(
+    conn: psycopg.Connection, day: date, west: float, south: float, east: float, north: float
+) -> pd.DataFrame:
+    """Infracciones de un día dentro de un recuadro del mapa."""
+    bbox = {"west": west, "south": south, "east": east, "north": north}
+    return _frame(conn, _INFRACTIONS_IN_BBOX, {"day": day, **bbox})
 
 
 def infraction_hotspots(conn: psycopg.Connection) -> pd.DataFrame:

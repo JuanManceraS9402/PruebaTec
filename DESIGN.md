@@ -87,7 +87,7 @@ para que reprocesar no duplique alertas.
 
 | Objeto | Uso |
 |---|---|
-| `gold.vehicle_daily_kpi` | Un registro por vehículo y día local: distancia, % del tiempo en exceso, eventos bruscos/100 km, consumo, tanqueos, **Driver Score** y la traza del día (`LineString`) |
+| `gold.vehicle_daily_kpi` | Un registro por vehículo y día local: distancia, % del tiempo en exceso, eventos bruscos/100 km, consumo, tanqueos, **Driver Score**, la traza del día (`track_geom`) y su versión generalizada para el mapa (`track_map`, ~11 m de tolerancia) |
 | `gold.infraction_point` | Alertas desnormalizadas con nombre y tipo de geocerca (capa de puntos del mapa) |
 | `gold.infraction_grid_250m` | Malla de 250 m × 250 m con conteo de infracciones (para BI) |
 | `gold.infraction_hotspot` | Zonas calientes: `ST_ClusterDBSCAN` de los excesos (≥ 3 a menos de 600 m, en EPSG:9377); cada zona es la envolvente convexa con 150 m de margen. Pocos polígonos con significado, en vez de decenas de celdas sueltas en el mapa |
@@ -397,6 +397,33 @@ Lectura honesta de los números:
   en esta prueba.
 * La malla de calor de Oro no se calcula al consultar: es una vista materializada, de modo
   que el tablero lee el resultado ya agregado.
+
+### Capa Oro: lo que espera el tablero
+
+[docs/benchmark_gold.md](docs/benchmark_gold.md) construye Oro desde sus definiciones reales
+sobre **5.040.000 puntos y ~125.000 alertas**, y ejecuta las consultas del tablero como
+`bi_analyst`, midiendo consulta más transferencia de filas.
+
+| Consulta | Antes de optimizar | Ahora |
+|---|---:|---:|
+| KPIs y rutas del día, 500 vehículos | 151 ms (15,7 MB) | **27 ms** (3,7 MB) |
+| Infracciones del día (~18.000 filas) | 124 ms | **65 ms** |
+| Infracciones en un recuadro del mapa | 72 ms | **2 ms** |
+| Top 10 peores conductores | 6 ms | **1,5 ms** |
+| Malla de calor de 250 m | 12 ms | **10 ms** |
+
+Tres cambios explican la mejora, y los tres salieron de leer los planes:
+
+* **ID enmascarado precalculado** por vehículo (`security.vehicle_pseudonym.masked_id`):
+  evaluar la expresión regular en cada fila consumía casi todo el tiempo.
+* **`analytics.infraction_map`, sin IDs de vehículo.** PostgreSQL no empuja operadores que no
+  son *leakproof* (como `&&`) a través de una vista `security_barrier`, así que el filtro
+  espacial no llegaba al GiST. Una vista sin nada que enmascarar no necesita barrera.
+* **Ruta generalizada** para el mapa (`track_map`): menos vértices que enviar al navegador.
+
+El costo se paga al refrescar: reconstruir las cuatro vistas tarda ~12 s con este volumen.
+Los datos son sintéticos y casi uniformes, por lo que DBSCAN los une en muy pocas zonas: el
+tiempo de *Zonas calientes* no representa un caso con muchas zonas.
 
 ---
 

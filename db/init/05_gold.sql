@@ -80,7 +80,11 @@ SELECT
     (d.harsh_events * 100.0 / nullif(d.distance_km, 0))::numeric,
     d.max_excess_kmh::numeric
   )                                                                         AS driver_score,
-  CASE WHEN d.valid_points >= 2 THEN d.raw_track END                        AS track_geom
+  CASE WHEN d.valid_points >= 2 THEN d.raw_track END                        AS track_geom,
+  -- Versión para el mapa: ~11 m de tolerancia (0,0001° cerca del ecuador), invisible a
+  -- escala de ciudad y con muchos menos vértices que enviar al navegador.
+  CASE WHEN d.valid_points >= 2 THEN ST_Simplify(d.raw_track, 0.0001, true) END
+                                                                            AS track_map
 FROM daily d
 LEFT JOIN ref.vehicle v ON v.vehicle_id = d.vehicle_id
 WITH DATA;

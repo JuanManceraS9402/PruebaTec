@@ -27,6 +27,7 @@ la enriquece con geocercas, genera alertas y expone KPIs de *Driver Score* para 
 | [DESIGN.md](DESIGN.md) | Arquitectura, modelo de datos, índices, lógica espacial, seguridad y trade-offs para Big Data |
 | [SETUP.md](SETUP.md) | Despliegue local paso a paso (Docker + Python) |
 | [docs/benchmark.md](docs/benchmark.md) | Resultados de `EXPLAIN (ANALYZE, BUFFERS)` sobre millones de puntos |
+| [docs/benchmark_gold.md](docs/benchmark_gold.md) | Capa Oro con 5 M de puntos: todas las consultas del tablero por debajo de 100 ms |
 
 ## Inicio rápido
 
@@ -81,8 +82,8 @@ flowchart LR
 │   ├── benchmark/              # Generador masivo y lectura de planes EXPLAIN
 │   ├── sandbox.py              # Simulación bajo demanda de un vehículo
 │   ├── routing.py              # Ruta por vías entre dos puntos (OSRM)
-│   └── dashboard/              # Consultas, gráficos y transformaciones del tablero
-├── dashboard/app.py            # Tablero Streamlit + pydeck (mapa base CARTO u ortofoto)
+│   └── dashboard/              # Datos, capas, gráficos, secciones y simulador del tablero
+├── dashboard/app.py            # Punto de entrada del tablero Streamlit
 ├── scripts/                    # Descarga de rutas (OSRM) y geocercas (datos abiertos)
 ├── tests/
 │   ├── unit/                   # Sin base de datos
