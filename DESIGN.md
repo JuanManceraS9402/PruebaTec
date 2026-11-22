@@ -283,7 +283,10 @@ Pregunta de negocio: **¿le alcanza el combustible para terminar la ruta asignad
    perpendicular (si el vehículo se desvió, primero debe volver).
 6. **Riesgo:** `CRITICAL` si la autonomía no cubre lo que falta; `HIGH` si la cubre pero
    sin el margen de seguridad (`fuel_safety_factor` = 1,15). Misma política de una alerta
-   por episodio.
+   por episodio, con **histéresis**: la autonomía estimada oscila con el ruido del sensor,
+   así que el episodio solo termina al tanquear o si la autonomía se mantiene 10 % sobre
+   la requerida durante 3 km seguidos (`fuel_alert_clear_ratio`, `fuel_alert_clear_km`).
+   Sin esto, un vehículo justo en el límite generaba decenas de alertas.
 
 Limitación conocida: en rutas que se cruzan o regresan sobre sí mismas la proyección al
 punto más cercano es ambigua. Se resolvería restringiendo la búsqueda a partir del

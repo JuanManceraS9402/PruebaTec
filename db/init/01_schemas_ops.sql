@@ -39,6 +39,8 @@ INSERT INTO ops.parameter (name, value, unit, description) VALUES
   ('accel_max_gap_s',           30,   's',     'Hueco máximo entre reportes para calcular aceleración (más allá no es fiable)'),
   ('refuel_min_jump_pct',       5,    '%',     'Subida mínima de combustible para considerar un tanqueo'),
   ('fuel_safety_factor',        1.15, 'ratio', 'Margen de seguridad: autonomía requerida = distancia restante × factor'),
+  ('fuel_alert_clear_ratio',    1.10, 'ratio', 'Histéresis: autonomía >= requerida × este valor para empezar a cerrar el episodio'),
+  ('fuel_alert_clear_km',       3,    'km',    'Distancia seguida sobre ese margen para dar por terminado el episodio de combustible'),
   ('consumption_window_km',     30,   'km',    'Ventana móvil de distancia para estimar el consumo real L/100km'),
   ('min_consumption_sample_km', 3,    'km',    'Distancia mínima en la ventana para confiar en el consumo medido');
 

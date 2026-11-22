@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from shapely.geometry import LineString
 
-from simon_geo.domain import AlertType, Severity, ZoneType
+from simon_geo.domain import AlertType, Severity, Vehicle, ZoneType
 from simon_geo.rules.track import MAX_CONSECUTIVE_OUTLIERS, TrackProcessor
 from simon_geo.spatial.geofencing import GeofenceIndex
 from simon_geo.spatial.routes import PlannedRoute
@@ -96,6 +96,61 @@ class TestFuel:
         assert fuel_alerts[0].severity is Severity.CRITICAL
         assert fuel_alerts[0].observed_value == pytest.approx(10, abs=0.01)
         assert all(e.is_low_fuel_risk for e in enriched)
+
+    @staticmethod
+    def fuel_track(point_factory, levels):
+        return [
+            point_factory(seconds=3 * i, lat=4.60 + 0.00001 * i, lon=-74.10, speed=10, fuel=f)
+            for i, f in enumerate(levels)
+        ]
+
+    @staticmethod
+    def fuel_alerts(alerts):
+        return [a for a in alerts if a.alert_type is AlertType.LOW_FUEL_RANGE]
+
+    def test_noise_around_threshold_keeps_one_alert(self, point_factory, vehicle, params) -> None:
+        """Ruta ~11 km → requeridos ~12,7. El nivel oscila entre 12,3 y 13,0 km de autonomía."""
+        proc = TrackProcessor(vehicle, INDEX, params, route=ROUTE)
+        enriched, alerts = run(proc, self.fuel_track(point_factory, [3.7, 3.9] * 20))
+        assert len(self.fuel_alerts(alerts)) == 1
+        # el indicador por punto sigue reflejando el estado real de cada reporte
+        assert {e.is_low_fuel_risk for e in enriched} == {True, False}
+
+    def test_clear_recovery_starts_a_new_episode(self, point_factory, vehicle, params) -> None:
+        proc = TrackProcessor(vehicle, INDEX, params, route=ROUTE)
+        # 3,7 % = riesgo; >3 km sobre el margen cierran el episodio; 2,5 % vuelve al riesgo
+        levels = [3.7] + [4.5] * 100 + [2.5]
+        points = [
+            point_factory(seconds=3 * i, lat=4.60 + STEP_DEG * i, lon=-74.10, speed=40, fuel=f)
+            for i, f in enumerate(levels)
+        ]
+        _, alerts = run(proc, points)
+        assert [a.severity for a in self.fuel_alerts(alerts)] == [Severity.HIGH, Severity.HIGH]
+
+    def test_short_recovery_does_not_close_episode(self, point_factory, vehicle, params) -> None:
+        proc = TrackProcessor(vehicle, INDEX, params, route=ROUTE)
+        levels = [3.7] + [4.5] * 20 + [3.7]  # ~0,7 km sobre el margen: es ruido, no recuperación
+        points = [
+            point_factory(seconds=3 * i, lat=4.60 + STEP_DEG * i, lon=-74.10, speed=40, fuel=f)
+            for i, f in enumerate(levels)
+        ]
+        _, alerts = run(proc, points)
+        assert len(self.fuel_alerts(alerts)) == 1
+
+    def test_escalation_alerts_once_despite_noise(self, point_factory, vehicle, params) -> None:
+        proc = TrackProcessor(vehicle, INDEX, params, route=ROUTE)
+        _, alerts = run(proc, self.fuel_track(point_factory, [3.7, 3.0, 3.7, 3.0, 3.7]))
+        assert [a.severity for a in self.fuel_alerts(alerts)] == [
+            Severity.HIGH,
+            Severity.CRITICAL,
+        ]
+
+    def test_refuel_closes_episode(self, point_factory, params) -> None:
+        small = Vehicle("VHC-8472-ABC", fuel_tank_capacity_l=20, nominal_consumption_l_100km=30)
+        proc = TrackProcessor(small, INDEX, params, route=ROUTE)
+        # Tras tanquear sigue sin alcanzar (6,2 % de 20 L ≈ 4 km): es un episodio nuevo
+        _, alerts = run(proc, self.fuel_track(point_factory, [1.0, 1.0, 6.2]))
+        assert len(self.fuel_alerts(alerts)) == 2
 
     def test_enough_fuel_no_alert(self, point_factory, vehicle, params) -> None:
         proc = TrackProcessor(vehicle, INDEX, params, route=ROUTE)

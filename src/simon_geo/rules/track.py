@@ -98,6 +98,7 @@ class TrackProcessor:
         self._odometer_km = 0.0
         self._speeding_severity: Severity | None = None
         self._fuel_severity: Severity | None = None
+        self._fuel_clear_from_km: float | None = None
 
     @property
     def odometer_km(self) -> float:
@@ -154,6 +155,8 @@ class TrackProcessor:
         # 4. Consumo, autonomía y riesgo de ruta
         if refuel:
             self._estimator.reset()
+            self._fuel_severity = None  # tanquear cierra el episodio de combustible
+            self._fuel_clear_from_km = None
         if not is_outlier:
             # un re-anclaje no suma el "salto" al odómetro
             if not seg.is_gps_outlier:
@@ -238,6 +241,22 @@ class TrackProcessor:
             },
         )
 
+    def _update_fuel_recovery(self, risk: FuelRiskAssessment) -> None:
+        """Cierra el episodio solo con una recuperación sostenida.
+
+        El ruido del sensor mueve la autonomía ~0,7 km en un tanque de 150 L: cerca del fin
+        de la ruta eso cruza cualquier margen relativo. Por eso se exige mantenerse sobre el
+        margen durante ``fuel_alert_clear_km`` seguidos.
+        """
+        if risk.range_km < risk.required_km * self._params.fuel_alert_clear_ratio:
+            self._fuel_clear_from_km = None
+            return
+        if self._fuel_clear_from_km is None:
+            self._fuel_clear_from_km = self._odometer_km
+        if self._odometer_km - self._fuel_clear_from_km >= self._params.fuel_alert_clear_km:
+            self._fuel_severity = None
+            self._fuel_clear_from_km = None
+
     def _fuel_alert(
         self,
         point: TelemetryPoint,
@@ -248,8 +267,9 @@ class TrackProcessor:
         if risk is None:
             return None  # sin ruta o posición no fiable: se mantiene el estado
         if not risk.is_risk or risk.severity is None:
-            self._fuel_severity = None
+            self._update_fuel_recovery(risk)
             return None
+        self._fuel_clear_from_km = None
         if self._fuel_severity is not None and risk.severity.rank <= self._fuel_severity.rank:
             return None
         self._fuel_severity = risk.severity

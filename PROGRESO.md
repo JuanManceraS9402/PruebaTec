@@ -28,7 +28,7 @@
 | Tablero Streamlit | Mapa (capas, leyenda, ortofoto IDECA híbrida), BI interactivo (ranking clicable, perfil del vehículo, infracciones por zona y en el tiempo), filtro de placas con un clic, créditos al pie |
 | Simulador en el tablero | Solo administrador: ruta existente o dos clics en un mapa (OSRM), pipeline real, limpieza con **Borrar simulados** (`sandbox.py`, `routing.py`, `08_sandbox.sql`) |
 | Docs | `README.md`, `DESIGN.md`, `SETUP.md` y `docs/benchmark.md` al día, con fuentes y licencias |
-| Pruebas | 232 unitarias y 60 de integración. La CI corre las dos contra PostGIS real |
+| Pruebas | 237 unitarias y 60 de integración. La CI corre las dos contra PostGIS real |
 
 ## 3. Cómo levantar todo (este PC, sin Docker)
 

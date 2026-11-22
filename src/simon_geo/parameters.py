@@ -23,6 +23,8 @@ class PipelineParameters:
     accel_max_gap_s: float = 30.0
     refuel_min_jump_pct: float = 5.0
     fuel_safety_factor: float = 1.15
+    fuel_alert_clear_ratio: float = 1.10
+    fuel_alert_clear_km: float = 3.0
     consumption_window_km: float = 30.0
     min_consumption_sample_km: float = 3.0
 
@@ -32,6 +34,8 @@ class PipelineParameters:
                 raise ValueError(f"El parámetro {f.name} debe ser positivo")
         if self.fuel_safety_factor < 1:
             raise ValueError("fuel_safety_factor debe ser >= 1")
+        if self.fuel_alert_clear_ratio < 1:
+            raise ValueError("fuel_alert_clear_ratio debe ser >= 1")
 
     @classmethod
     def from_mapping(cls, values: Mapping[str, float | Decimal]) -> Self:
