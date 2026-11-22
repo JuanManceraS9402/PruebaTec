@@ -21,7 +21,7 @@ jobs:
       - run: pip install -e ".[dev,dashboard]"
       - run: ruff check src tests dashboard
       - run: ruff format --check src tests dashboard
-      - run: pytest -m "not integration" --cov=simon_geo --cov-report=term-missing
+      - run: pytest -m "not integration" --cov=gps_flota --cov-report=term-missing
 
   integration:
     name: Integración con PostGIS (docker compose)
@@ -43,7 +43,7 @@ jobs:
       - run: pip install -e ".[dev,dashboard]"
 
       - name: Cargar escenario Bogotá
-        run: python -m simon_geo.seed
+        run: python -m gps_flota.seed
 
       - name: Tests de integración
         run: pytest -m integration -v

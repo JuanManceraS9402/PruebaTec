@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 import psycopg
 import pytest
 
-from simon_geo.config import DbRole
+from gps_flota.config import DbRole
 
 pytestmark = pytest.mark.integration
 

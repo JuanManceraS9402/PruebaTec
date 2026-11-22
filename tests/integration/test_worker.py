@@ -13,16 +13,16 @@ from datetime import UTC, datetime, timedelta
 import psycopg
 import pytest
 
-from simon_geo.api.repository import PostgresRepository
-from simon_geo.config import DbRole
-from simon_geo.db import PoolRegistry, connect
-from simon_geo.domain import TelemetryPoint
-from simon_geo.parameters import PipelineParameters
-from simon_geo.processing.enrichment import SilverEnricher
-from simon_geo.processing.worker import BronzeToSilverWorker, WorkerConfig
-from simon_geo.seed import bogota
-from simon_geo.simulator.fleet import FleetSimulator
-from simon_geo.spatial.geofencing import GeofenceIndex
+from gps_flota.api.repository import PostgresRepository
+from gps_flota.config import DbRole
+from gps_flota.db import PoolRegistry, connect
+from gps_flota.domain import TelemetryPoint
+from gps_flota.parameters import PipelineParameters
+from gps_flota.processing.enrichment import SilverEnricher
+from gps_flota.processing.worker import BronzeToSilverWorker, WorkerConfig
+from gps_flota.seed import bogota
+from gps_flota.simulator.fleet import FleetSimulator
+from gps_flota.spatial.geofencing import GeofenceIndex
 
 pytestmark = pytest.mark.integration
 

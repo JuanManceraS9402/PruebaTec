@@ -3,7 +3,7 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "simon-geo"
+name = "gps-flota"
 version = "0.1.0"
 description = "Pipeline geoespacial Bronce/Plata/Oro para telemetría vehicular IoT/AVL"
 readme = "README.md"
@@ -40,7 +40,7 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-"simon_geo.seed" = ["data/*.geojson"]
+"gps_flota.seed" = ["data/*.geojson"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

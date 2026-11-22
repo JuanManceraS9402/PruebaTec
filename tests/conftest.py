@@ -6,8 +6,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from shapely.geometry import Polygon, box
 
-from simon_geo.domain import Geofence, TelemetryPoint, Vehicle, ZoneType
-from simon_geo.parameters import PipelineParameters
+from gps_flota.domain import Geofence, TelemetryPoint, Vehicle, ZoneType
+from gps_flota.parameters import PipelineParameters
 
 T0 = datetime(2026, 11, 20, 11, 0, tzinfo=UTC)  # 06:00 en Bogotá
 

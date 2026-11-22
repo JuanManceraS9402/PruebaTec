@@ -6,14 +6,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from simon_geo.api.repository import PostgresRepository
-from simon_geo.config import DbRole
-from simon_geo.db import PoolRegistry
-from simon_geo.domain import TelemetryPoint
-from simon_geo.processing.queries import BRONZE_POINTS_WITH_GEOFENCES
-from simon_geo.seed import bogota
-from simon_geo.simulator.fleet import FleetSimulator
-from simon_geo.spatial.geofencing import GeofenceIndex
+from gps_flota.api.repository import PostgresRepository
+from gps_flota.config import DbRole
+from gps_flota.db import PoolRegistry
+from gps_flota.domain import TelemetryPoint
+from gps_flota.processing.queries import BRONZE_POINTS_WITH_GEOFENCES
+from gps_flota.seed import bogota
+from gps_flota.simulator.fleet import FleetSimulator
+from gps_flota.spatial.geofencing import GeofenceIndex
 
 pytestmark = pytest.mark.integration
 

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from simon_geo.benchmark.gold import QueryResult, _to_bench, dashboard_query, render
-from simon_geo.benchmark.runner import BenchmarkConfig
+from gps_flota.benchmark.gold import QueryResult, _to_bench, dashboard_query, render
+from gps_flota.benchmark.runner import BenchmarkConfig
 
 
 def test_definitions_read_benchmark_tables_only() -> None:

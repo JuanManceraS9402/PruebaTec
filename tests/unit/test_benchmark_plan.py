@@ -6,8 +6,8 @@ from datetime import date
 
 import pytest
 
-from simon_geo.benchmark.plan import PlanSummary, median_ms, summarize
-from simon_geo.benchmark.runner import BenchmarkConfig, scenarios
+from gps_flota.benchmark.plan import PlanSummary, median_ms, summarize
+from gps_flota.benchmark.runner import BenchmarkConfig, scenarios
 
 
 def plan(root: dict, execution_ms: float = 12.5) -> list[dict]:

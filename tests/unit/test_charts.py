@@ -7,8 +7,8 @@ import json
 import pandas as pd
 import pytest
 
-from simon_geo.dashboard import charts
-from simon_geo.dashboard.views import SEVERITY_COLORS
+from gps_flota.dashboard import charts
+from gps_flota.dashboard.views import SEVERITY_COLORS
 
 
 @pytest.fixture

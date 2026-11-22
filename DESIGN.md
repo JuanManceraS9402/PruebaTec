@@ -296,7 +296,7 @@ punto más cercano es ambigua. Se resolvería restringiendo la búsqueda a parti
 
 ## 5. Procesamiento incremental (worker)
 
-`processing/worker.py` (`python -m simon_geo.processing [--loop]`):
+`processing/worker.py` (`python -m gps_flota.processing [--loop]`):
 
 ```
 BEGIN

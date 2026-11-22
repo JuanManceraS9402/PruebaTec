@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from simon_geo.dashboard.views import (
+from gps_flota.dashboard.views import (
     BOGOTA_VIEW,
     HEATMAP_COLORS,
     SEVERITY_COLORS,
@@ -126,7 +126,7 @@ def test_app_starts_without_crashing(monkeypatch) -> None:
     st.cache_resource.clear()  # que no reutilice una conexión abierta por otra prueba
     st.cache_data.clear()
     monkeypatch.setenv("DB_PORT", "1")  # puerto cerrado: falla rápido y de forma determinista
-    from simon_geo.config import get_settings
+    from gps_flota.config import get_settings
 
     get_settings.cache_clear()
     try:

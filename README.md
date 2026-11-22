@@ -1,4 +1,4 @@
-# Simón Geo · Pipeline geoespacial de telemetría vehicular
+# Seguimiento GPS flota vehicular
 
 [![CI](https://github.com/JuanManceraS9402/PruebaTec/actions/workflows/ci.yml/badge.svg)](https://github.com/JuanManceraS9402/PruebaTec/actions/workflows/ci.yml)
 
@@ -37,10 +37,10 @@ docker compose up -d --wait                      # PostGIS con todo el esquema
 python -m venv .venv && .venv/Scripts/activate   # Linux/macOS: source .venv/bin/activate
 pip install -e ".[dev,dashboard]"
 
-python -m simon_geo.seed                         # vehículos, geocercas y rutas de Bogotá
-uvicorn simon_geo.api.app:app                    # API en :8000 (otra terminal)
-python -m simon_geo.simulator --out data/telemetry.jsonl --api-url http://localhost:8000
-python -m simon_geo.processing                   # Bronce → Plata → Oro
+python -m gps_flota.seed                         # vehículos, geocercas y rutas de Bogotá
+uvicorn gps_flota.api.app:app                    # API en :8000 (otra terminal)
+python -m gps_flota.simulator --out data/telemetry.jsonl --api-url http://localhost:8000
+python -m gps_flota.processing                   # Bronce → Plata → Oro
 streamlit run dashboard/app.py                   # tablero en :8501
 ```
 
@@ -72,7 +72,7 @@ flowchart LR
 │   ├── 06_security.sql         #   Roles, enmascaramiento, esquema analytics
 │   ├── 07_users.sh             #   Usuarios de login
 │   └── 08_sandbox.sql          #   Funciones del simulador (solo administrador)
-├── src/simon_geo/
+├── src/gps_flota/
 │   ├── api/                    # FastAPI: ingesta por lotes y lectura de alertas por rol
 │   ├── spatial/                # CRS (EPSG:9377), haversine, geocercas (STRtree), rutas
 │   ├── rules/                  # Velocidad, cinemática, combustible, TrackProcessor

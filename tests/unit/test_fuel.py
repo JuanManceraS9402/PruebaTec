@@ -5,15 +5,15 @@ import random
 import pytest
 from shapely.geometry import LineString
 
-from simon_geo.domain import Severity
-from simon_geo.rules.fuel import (
+from gps_flota.domain import Severity
+from gps_flota.rules.fuel import (
     ConsumptionEstimator,
     ConsumptionSource,
     assess_fuel_risk,
     estimate_range_km,
     is_refuel,
 )
-from simon_geo.spatial.routes import PlannedRoute
+from gps_flota.spatial.routes import PlannedRoute
 
 
 def make_estimator(tank: float = 200, nominal: float = 30) -> ConsumptionEstimator:

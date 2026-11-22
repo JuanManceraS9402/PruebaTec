@@ -4,9 +4,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from simon_geo.config import DbRole
-from simon_geo.parameters import PipelineParameters
-from simon_geo.spatial.crs import lonlat_to_metric
+from gps_flota.config import DbRole
+from gps_flota.parameters import PipelineParameters
+from gps_flota.spatial.crs import lonlat_to_metric
 
 pytestmark = pytest.mark.integration
 

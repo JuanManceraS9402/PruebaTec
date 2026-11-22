@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 from shapely.geometry import Polygon
 
-from simon_geo.domain import Geofence, ZoneType
-from simon_geo.spatial.geofencing import GeofenceIndex, resolve_speed_limit
+from gps_flota.domain import Geofence, ZoneType
+from gps_flota.spatial.geofencing import GeofenceIndex, resolve_speed_limit
 from tests.conftest import make_geofence, square
 
 URBAN = make_geofence(1, ZoneType.URBAN, 50, square(-74.08, 4.65, 0.05))

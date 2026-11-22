@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from simon_geo.domain import Severity, ZoneType
-from simon_geo.rules.speed import base_severity, evaluate_speed
-from simon_geo.spatial.geofencing import SpeedLimitDecision
+from gps_flota.domain import Severity, ZoneType
+from gps_flota.rules.speed import base_severity, evaluate_speed
+from gps_flota.spatial.geofencing import SpeedLimitDecision
 from tests.conftest import make_geofence, square
 
 URBAN_50 = SpeedLimitDecision(50, make_geofence(1, ZoneType.URBAN, 50, square(0, 0, 1)))

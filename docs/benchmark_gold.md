@@ -1,6 +1,6 @@
 # Benchmark de la capa Oro
 
-> Generado con `python -m simon_geo.benchmark.gold`. Mide lo que espera el tablero:
+> Generado con `python -m gps_flota.benchmark.gold`. Mide lo que espera el tablero:
 > consulta más transferencia de filas, como `bi_analyst` y a través de las vistas
 > enmascaradas. Los números dependen de la máquina.
 

@@ -1,12 +1,12 @@
-name: simon-geo
+name: gps-flota
 
 services:
   db:
     image: postgis/postgis:16-3.4
-    container_name: simon-geo-db
+    container_name: gps-flota-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-simon_geo}
+      POSTGRES_DB: ${POSTGRES_DB:-gps_flota}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev}
       TZ: UTC

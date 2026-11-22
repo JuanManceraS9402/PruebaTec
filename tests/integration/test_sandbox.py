@@ -9,11 +9,11 @@ import pytest
 from fastapi.testclient import TestClient
 from shapely.geometry import LineString
 
-from simon_geo.api.app import create_app
-from simon_geo.config import DbRole
-from simon_geo.sandbox import SandboxError, SandboxRequest, purge, run
-from simon_geo.seed import bogota
-from simon_geo.spatial.geofencing import GeofenceIndex
+from gps_flota.api.app import create_app
+from gps_flota.config import DbRole
+from gps_flota.sandbox import SandboxError, SandboxRequest, purge, run
+from gps_flota.seed import bogota
+from gps_flota.spatial.geofencing import GeofenceIndex
 
 pytestmark = pytest.mark.integration
 

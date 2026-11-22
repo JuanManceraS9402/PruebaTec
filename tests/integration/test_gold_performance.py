@@ -6,9 +6,9 @@ from datetime import date
 
 import pytest
 
-from simon_geo.benchmark.gold import main as gold_benchmark
-from simon_geo.config import DbRole
-from simon_geo.dashboard import data
+from gps_flota.benchmark.gold import main as gold_benchmark
+from gps_flota.config import DbRole
+from gps_flota.dashboard import data
 
 pytestmark = pytest.mark.integration
 

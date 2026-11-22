@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from simon_geo.config import DbRole
-from simon_geo.dashboard import data
+from gps_flota.config import DbRole
+from gps_flota.dashboard import data
 
 pytestmark = pytest.mark.integration
 

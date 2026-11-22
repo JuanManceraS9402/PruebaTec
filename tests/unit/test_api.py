@@ -8,9 +8,9 @@ from zoneinfo import ZoneInfo
 import pytest
 from fastapi.testclient import TestClient
 
-from simon_geo.api.app import create_app
-from simon_geo.config import DbRole, Settings
-from simon_geo.domain import TelemetryPoint
+from gps_flota.api.app import create_app
+from gps_flota.config import DbRole, Settings
+from gps_flota.domain import TelemetryPoint
 from tests.conftest import T0
 
 INGEST = {"X-API-Key": "dev-ingest-key"}

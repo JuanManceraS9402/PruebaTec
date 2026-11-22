@@ -47,7 +47,7 @@ Para equipos sin virtualización, donde Docker no puede arrancar:
 3. Después del paso 3 (entorno Python), inicializa la base:
 
    ```bash
-   python -m simon_geo.bootstrap          # --reset para recrearla desde cero
+   python -m gps_flota.bootstrap          # --reset para recrearla desde cero
    ```
 
    Hace lo mismo que el contenedor: crea la base, ejecuta `db/init/*.sql` en orden y crea
@@ -66,7 +66,7 @@ pip install -e ".[dev,dashboard]"
 ## 4. Datos maestros del escenario Bogotá
 
 ```bash
-python -m simon_geo.seed
+python -m gps_flota.seed
 ```
 
 Carga 10 vehículos, 2.257 geocercas reales (perímetro urbano del POT, 2.209 zonas
@@ -74,7 +74,7 @@ escolares, 44 tramos y puntos críticos de siniestralidad de la Secretaría de M
 corredores de OpenStreetMap y el patio), 6 rutas y la asignación de ruta de cada
 vehículo. Es idempotente.
 
-Los datos geográficos ya vienen versionados en `src/simon_geo/seed/data/`. Para
+Los datos geográficos ya vienen versionados en `src/gps_flota/seed/data/`. Para
 regenerarlos desde las fuentes (requiere internet):
 
 ```bash
@@ -85,7 +85,7 @@ python scripts/fetch_bogota_open_data.py  # geocercas (datos abiertos de Bogotá
 ## 5. API de ingesta
 
 ```bash
-uvicorn simon_geo.api.app:app --reload
+uvicorn gps_flota.api.app:app --reload
 ```
 
 Documentación interactiva en <http://localhost:8000/docs>.
@@ -95,14 +95,14 @@ Documentación interactiva en <http://localhost:8000/docs>.
 En otra terminal:
 
 ```bash
-python -m simon_geo.simulator --out data/telemetry.jsonl --api-url http://localhost:8000
+python -m gps_flota.simulator --out data/telemetry.jsonl --api-url http://localhost:8000
 ```
 
 ## 7. Procesar Bronce → Plata → Oro
 
 ```bash
-python -m simon_geo.processing              # procesa lo pendiente y termina
-python -m simon_geo.processing --loop -i 10 # cada 10 s, hasta Ctrl+C
+python -m gps_flota.processing              # procesa lo pendiente y termina
+python -m gps_flota.processing --loop -i 10 # cada 10 s, hasta Ctrl+C
 ```
 
 Cada lote enriquece lo nuevo de Bronce (geocercas, excesos de velocidad, riesgo de
@@ -149,19 +149,19 @@ vehículo** en la barra lateral:
 ## 9. Benchmark (millones de puntos)
 
 ```bash
-python -m simon_geo.benchmark                          # ~5 M de puntos, varios minutos
-python -m simon_geo.benchmark --vehicles 100 --days 2  # prueba rápida
+python -m gps_flota.benchmark                          # ~5 M de puntos, varios minutos
+python -m gps_flota.benchmark --vehicles 100 --days 2  # prueba rápida
 ```
 
 Genera los datos en un esquema aparte (`bench`), con las mismas particiones e índices que
 Bronce, y escribe `docs/benchmark.md` con los tiempos y planes de `EXPLAIN ANALYZE`. Para
-borrar esos datos: `python -m simon_geo.benchmark --drop`.
+borrar esos datos: `python -m gps_flota.benchmark --drop`.
 
 Para medir la capa Oro con las consultas reales del tablero:
 
 ```bash
-python -m simon_geo.benchmark.gold         # ~1 minuto, escribe docs/benchmark_gold.md
-python -m simon_geo.benchmark.gold --drop  # borra el esquema bench_gold
+python -m gps_flota.benchmark.gold         # ~1 minuto, escribe docs/benchmark_gold.md
+python -m gps_flota.benchmark.gold --drop  # borra el esquema bench_gold
 ```
 
 ## 10. Pruebas
@@ -188,6 +188,6 @@ en lugar de saltarse.
 Para ver el enmascaramiento en acción:
 
 ```bash
-docker compose exec db psql -U analyst_demo -d simon_geo \
+docker compose exec db psql -U analyst_demo -d gps_flota \
   -c "SELECT vehicle_id, vehicle_key, event_ts FROM analytics.telemetry_raw LIMIT 3"
 ```

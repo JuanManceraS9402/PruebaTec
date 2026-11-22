@@ -14,9 +14,9 @@ from pathlib import Path
 import psycopg
 import streamlit as st
 
-from simon_geo.dashboard.layers import SANDBOX_COLOR, TRACK_COLORS
-from simon_geo.dashboard.loaders import load_day, load_days, load_sandbox_keys, load_static
-from simon_geo.dashboard.sections import (
+from gps_flota.dashboard.layers import SANDBOX_COLOR, TRACK_COLORS
+from gps_flota.dashboard.loaders import load_day, load_days, load_sandbox_keys, load_static
+from gps_flota.dashboard.sections import (
     render_analysis,
     render_credits,
     render_kpis,
@@ -24,18 +24,18 @@ from simon_geo.dashboard.sections import (
     render_tables,
     resolve_focus,
 )
-from simon_geo.dashboard.sidebar import sidebar, vehicle_picker
-from simon_geo.dashboard.simulator_ui import (
+from gps_flota.dashboard.sidebar import sidebar, vehicle_picker
+from gps_flota.dashboard.simulator_ui import (
     MAP_ROUTE_MODE,
     render_sandbox_result,
     route_picker,
     simulator_panel,
 )
-from simon_geo.dashboard.views import vehicle_label
+from gps_flota.dashboard.views import vehicle_label
 
 STATIC_DIR = Path(__file__).parent / "static"  # ver .streamlit/config.toml
 
-st.set_page_config(page_title="Simón Geo · Flota", page_icon="🗺️", layout="wide")
+st.set_page_config(page_title="Seguimiento GPS flota vehicular", page_icon="🗺️", layout="wide")
 
 
 def main() -> None:
@@ -46,8 +46,8 @@ def main() -> None:
     except psycopg.OperationalError as exc:
         st.error(
             "No hay conexión con PostGIS. Levanta la base (`docker compose up -d --wait`, o "
-            "sin Docker `python -m simon_geo.bootstrap`) y procesa datos con "
-            f"`python -m simon_geo.processing`.\n\n`{exc}`"
+            "sin Docker `python -m gps_flota.bootstrap`) y procesa datos con "
+            f"`python -m gps_flota.processing`.\n\n`{exc}`"
         )
         st.stop()
 

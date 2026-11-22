@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from simon_geo.simulator.__main__ import _default_start
+from gps_flota.simulator.__main__ import _default_start
 
 
 @pytest.mark.parametrize(

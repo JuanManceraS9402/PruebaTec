@@ -1,6 +1,6 @@
 # Benchmark · consultas espaciales sobre millones de puntos GPS
 
-> Generado con `python -m simon_geo.benchmark`. Los números dependen de la máquina;
+> Generado con `python -m gps_flota.benchmark`. Los números dependen de la máquina;
 > lo relevante es la **diferencia entre variantes** y el **plan** que elige PostgreSQL.
 
 ## Datos

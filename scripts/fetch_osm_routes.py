@@ -1,4 +1,4 @@
-"""Genera ``src/simon_geo/seed/data/bogota_osm.geojson`` (rutas y corredores reales).
+"""Genera ``src/gps_flota/seed/data/bogota_osm.geojson`` (rutas y corredores reales).
 
 Herramienta de desarrollo: se ejecuta UNA vez y el GeoJSON resultante se versiona,
 así el proyecto funciona sin internet y es reproducible.
@@ -28,10 +28,10 @@ import httpx
 from shapely.geometry import LineString, MultiLineString, mapping
 from shapely.ops import linemerge
 
-from simon_geo.spatial.crs import to_metric, to_wgs84
+from gps_flota.spatial.crs import to_metric, to_wgs84
 
 OSRM: Final = "https://router.project-osrm.org/route/v1/driving/"
-OUT: Final = Path(__file__).resolve().parents[1] / "src/simon_geo/seed/data/bogota_osm.geojson"
+OUT: Final = Path(__file__).resolve().parents[1] / "src/gps_flota/seed/data/bogota_osm.geojson"
 SIMPLIFY_M: Final = 5.0
 
 # Puntos de paso (lon, lat), verificados con Nominatim sobre la vía correspondiente
@@ -127,7 +127,7 @@ def main() -> None:
             and f["properties"]["kind"] != "landmark"
         ]
     routes: dict[str, dict[str, Any]] = {}
-    with httpx.Client(timeout=30, headers={"User-Agent": "simon-geo-demo/0.1"}) as client:
+    with httpx.Client(timeout=30, headers={"User-Agent": "gps-flota-demo/0.1"}) as client:
         for code, (name, waypoints) in ROUTES.items():
             if code not in only:
                 continue

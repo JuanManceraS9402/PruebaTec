@@ -4,8 +4,8 @@ import math
 
 import pytest
 
-from simon_geo.rules.kinematics import segment_metrics
-from simon_geo.spatial.distance import EARTH_RADIUS_M, haversine_m
+from gps_flota.rules.kinematics import segment_metrics
+from gps_flota.spatial.distance import EARTH_RADIUS_M, haversine_m
 
 
 class TestHaversine:

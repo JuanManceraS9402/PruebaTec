@@ -5,7 +5,7 @@
 
 ## 1. Contexto
 
-- **Prueba técnica:** Ingeniero GIS / Desarrollador de Datos Espaciales (Simón Movilidad).
+- **Prueba técnica:** Ingeniero GIS / Desarrollador de Datos Espaciales.
 - **Pide:** pipeline Bronce → Plata → Oro en PostgreSQL + PostGIS:
   - ingesta con enmascaramiento `VHC-****-ABC`;
   - geocercas;
@@ -37,11 +37,11 @@ PostgreSQL 19 + PostGIS 3.7 nativo en el **puerto 5433**. La contraseña está e
 ```powershell
 cd E:\Usuario\Documentos\Movilidad
 .venv\Scripts\activate
-python -m simon_geo.bootstrap --reset          # base limpia
-python -m simon_geo.seed                       # 10 vehículos, 2.257 geocercas, 6 rutas
-uvicorn simon_geo.api.app:app                  # otra terminal
-python -m simon_geo.simulator --out data/telemetry.jsonl --api-url http://localhost:8000
-python -m simon_geo.processing --settle-s 0
+python -m gps_flota.bootstrap --reset          # base limpia
+python -m gps_flota.seed                       # 10 vehículos, 2.257 geocercas, 6 rutas
+uvicorn gps_flota.api.app:app                  # otra terminal
+python -m gps_flota.simulator --out data/telemetry.jsonl --api-url http://localhost:8000
+python -m gps_flota.processing --settle-s 0
 streamlit run dashboard/app.py                 # DESDE LA RAÍZ (lee .streamlit/config.toml)
 ```
 
@@ -60,7 +60,7 @@ streamlit run dashboard/app.py                 # DESDE LA RAÍZ (lee .streamlit/
 | Ortofoto urbana 2025 | SDP, publicada por IDECA – UAECD (ImageServer `orthourbana2025funcion`) | Servicio público |
 | Mapa base | CARTO Positron (vectorial, sin clave) | — |
 
-- **Scripts de datos:** `scripts/fetch_bogota_open_data.py` y `scripts/fetch_osm_routes.py --only R04,...`. Los GeoJSON resultantes están versionados en `src/simon_geo/seed/data/`.
+- **Scripts de datos:** `scripts/fetch_bogota_open_data.py` y `scripts/fetch_osm_routes.py --only R04,...`. Los GeoJSON resultantes están versionados en `src/gps_flota/seed/data/`.
 - **Dónde están las referencias:** en el README (tabla "Datos y créditos"), en `DESIGN.md` §3 y en el tablero (desplegable "Fuentes de datos y licencias" al pie).
 - **Lo que no se usó:**
   - el histórico de siniestros, porque dejó de ser público;

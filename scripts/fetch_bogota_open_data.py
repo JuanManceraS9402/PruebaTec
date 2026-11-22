@@ -1,4 +1,4 @@
-"""Genera ``src/simon_geo/seed/data/bogota_open_data.geojson`` con geocercas reales.
+"""Genera ``src/gps_flota/seed/data/bogota_open_data.geojson`` con geocercas reales.
 
 Herramienta de desarrollo: se ejecuta UNA vez y el GeoJSON resultante se versiona,
 así el proyecto funciona sin internet y es reproducible.
@@ -42,10 +42,10 @@ from shapely import transform as shp_transform
 from shapely.geometry import LinearRing, MultiPolygon, Point, Polygon, mapping, shape
 from shapely.ops import unary_union
 
-from simon_geo.spatial.crs import to_metric, to_wgs84
+from gps_flota.spatial.crs import to_metric, to_wgs84
 
 OUT: Final = (
-    Path(__file__).resolve().parents[1] / "src/simon_geo/seed/data/bogota_open_data.geojson"
+    Path(__file__).resolve().parents[1] / "src/gps_flota/seed/data/bogota_open_data.geojson"
 )
 SCHOOL_RADIUS_M: Final = 100.0  # ~ la cuadra frente a la sede
 CRITICAL_POINT_RADIUS_M: Final = 100.0
@@ -209,7 +209,7 @@ def critical(client: httpx.Client) -> list[dict[str, Any]]:
 
 
 def main() -> None:
-    with httpx.Client(timeout=90, headers={"User-Agent": "simon-geo-demo/0.1"}) as client:
+    with httpx.Client(timeout=90, headers={"User-Agent": "gps-flota-demo/0.1"}) as client:
         features = [perimeter(client), *critical(client), *schools(client)]
     collection = {
         "type": "FeatureCollection",

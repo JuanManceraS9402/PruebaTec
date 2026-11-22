@@ -1,7 +1,7 @@
 """Pipeline en memoria completo: escenario Bogotá → simulador → enriquecimiento.
 
 Verifica que cada vehículo del escenario dispara exactamente la regla que
-debe ejercitar (ver ``simon_geo.seed.bogota.scenario``).
+debe ejercitar (ver ``gps_flota.seed.bogota.scenario``).
 """
 
 from __future__ import annotations
@@ -10,12 +10,12 @@ from collections import defaultdict
 
 import pytest
 
-from simon_geo.domain import AlertType, ZoneType
-from simon_geo.parameters import PipelineParameters
-from simon_geo.processing.enrichment import EnrichmentResult, SilverEnricher
-from simon_geo.seed import bogota
-from simon_geo.simulator.fleet import FleetSimulator, SimulationConfig
-from simon_geo.spatial.geofencing import GeofenceIndex, resolve_speed_limit
+from gps_flota.domain import AlertType, ZoneType
+from gps_flota.parameters import PipelineParameters
+from gps_flota.processing.enrichment import EnrichmentResult, SilverEnricher
+from gps_flota.seed import bogota
+from gps_flota.simulator.fleet import FleetSimulator, SimulationConfig
+from gps_flota.spatial.geofencing import GeofenceIndex, resolve_speed_limit
 from tests.conftest import T0
 
 GEOFENCES = {g.code: g for g in bogota.geofences()}

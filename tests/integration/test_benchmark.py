@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from simon_geo.benchmark.runner import QUALIFIED, SCHEMA, BenchmarkConfig, render_markdown, run
-from simon_geo.config import DbRole
-from simon_geo.db import connect
+from gps_flota.benchmark.runner import QUALIFIED, SCHEMA, BenchmarkConfig, render_markdown, run
+from gps_flota.config import DbRole
+from gps_flota.db import connect
 
 pytestmark = pytest.mark.integration
 

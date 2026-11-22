@@ -5,7 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from simon_geo.routing import Place, RoutingError, in_service_area, next_points, plan_route
+from gps_flota.routing import Place, RoutingError, in_service_area, next_points, plan_route
 
 LINE = [[-74.15, 4.668], [-74.12, 4.68], [-74.09, 4.70]]
 A = Place(-74.15, 4.668)

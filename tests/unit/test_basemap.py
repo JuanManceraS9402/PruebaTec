@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from simon_geo.dashboard.basemap import ORTHO_ATTRIBUTION, hybrid_style
+from gps_flota.dashboard.basemap import ORTHO_ATTRIBUTION, hybrid_style
 
 BASE = {
     "version": 8,

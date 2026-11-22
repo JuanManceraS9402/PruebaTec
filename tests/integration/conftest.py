@@ -12,10 +12,10 @@ from datetime import UTC, datetime
 import psycopg
 import pytest
 
-from simon_geo.config import DbRole, Settings
-from simon_geo.db import connect
-from simon_geo.reference import upsert_reference
-from simon_geo.seed import bogota
+from gps_flota.config import DbRole, Settings
+from gps_flota.db import connect
+from gps_flota.reference import upsert_reference
+from gps_flota.seed import bogota
 
 
 @pytest.fixture(scope="session")

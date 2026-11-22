@@ -7,10 +7,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from simon_geo.config import Settings
-from simon_geo.sandbox import SandboxError, SandboxRequest, check_time_window, simulate_points
-from simon_geo.seed import bogota
-from simon_geo.spatial.geofencing import GeofenceIndex
+from gps_flota.config import Settings
+from gps_flota.sandbox import SandboxError, SandboxRequest, check_time_window, simulate_points
+from gps_flota.seed import bogota
+from gps_flota.spatial.geofencing import GeofenceIndex
 
 START = datetime(2026, 11, 20, 13, 0, tzinfo=UTC)
 ROUTES = bogota.routes()

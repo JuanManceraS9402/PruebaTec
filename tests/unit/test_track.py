@@ -3,10 +3,10 @@ from __future__ import annotations
 import pytest
 from shapely.geometry import LineString
 
-from simon_geo.domain import AlertType, Severity, Vehicle, ZoneType
-from simon_geo.rules.track import MAX_CONSECUTIVE_OUTLIERS, TrackProcessor
-from simon_geo.spatial.geofencing import GeofenceIndex
-from simon_geo.spatial.routes import PlannedRoute
+from gps_flota.domain import AlertType, Severity, Vehicle, ZoneType
+from gps_flota.rules.track import MAX_CONSECUTIVE_OUTLIERS, TrackProcessor
+from gps_flota.spatial.geofencing import GeofenceIndex
+from gps_flota.spatial.routes import PlannedRoute
 from tests.conftest import make_geofence, square
 
 URBAN = make_geofence(1, ZoneType.URBAN, 50, square(-74.10, 4.65, 0.2))

@@ -12,16 +12,16 @@ from types import SimpleNamespace
 import pytest
 from psycopg.types.json import Jsonb
 
-from simon_geo.domain import AlertType, Severity, ZoneType
-from simon_geo.processing.enrichment import SilverEnricher
-from simon_geo.processing.worker import (
+from gps_flota.domain import AlertType, Severity, ZoneType
+from gps_flota.processing.enrichment import SilverEnricher
+from gps_flota.processing.worker import (
     BronzeToSilverWorker,
     WorkerConfig,
     alert_row,
     enrich_window,
     silver_row,
 )
-from simon_geo.spatial.geofencing import GeofenceIndex
+from gps_flota.spatial.geofencing import GeofenceIndex
 from tests.conftest import T0, make_geofence, square
 
 URBAN = make_geofence(7, ZoneType.URBAN, 50, square(-74.08, 4.65, 0.05))
