@@ -5,7 +5,8 @@ from __future__ import annotations
 import html
 import json
 import math
-from collections.abc import Iterable, Mapping
+from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Final
@@ -49,6 +50,26 @@ class FleetSummary:
 def vehicle_label(vehicle_id: str, vehicle_key: str | None) -> str:
     """Etiqueta única: el ID enmascarado puede repetirse (VHC-****-ABC), el seudónimo no."""
     return f"{vehicle_id} · {vehicle_key}" if vehicle_key else vehicle_id
+
+
+def compact_vehicle_labels(vehicles: Iterable[tuple[str, str]]) -> dict[str, str]:
+    """{clave: etiqueta corta} para el filtro: ``8472-ABC`` o ``****-ABC``.
+
+    Sin el prefijo caben más por fila. Si dos enmascarados coinciden, se distinguen con
+    el final del seudónimo (nunca con datos del ID real).
+    """
+    pairs = [(key, vehicle_id.split("-", 1)[-1]) for vehicle_id, key in vehicles]
+    repeated = Counter(short for _, short in pairs)
+    return {key: f"{short} · {key[-4:]}" if repeated[short] > 1 else short for key, short in pairs}
+
+
+def reconcile_selection(
+    options: Sequence[str], selected: Iterable[str], known: Iterable[str]
+) -> list[str]:
+    """Selección válida para las opciones actuales: quita las que ya no existen y agrega
+    las nuevas (un vehículo recién simulado aparece encendido)."""
+    selected, known = set(selected), set(known)
+    return [key for key in options if key in selected or key not in known]
 
 
 def line_path(geojson: str | None) -> list[list[float]]:

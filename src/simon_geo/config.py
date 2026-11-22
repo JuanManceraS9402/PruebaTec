@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     api_key_ingest: SecretStr = SecretStr("dev-ingest-key")
     api_key_analyst: SecretStr = SecretStr("dev-analyst-key")
     api_key_admin: SecretStr = SecretStr("dev-admin-key")
+    api_url: str = "http://localhost:8000"  # la usa el simulador del tablero
     ingest_max_batch: int = 5000
     ingest_max_future_s: int = 300  # tolerancia a relojes de equipo adelantados
     ingest_max_age_days: int = 30  # paquetes más viejos se rechazan (buffer de equipo)

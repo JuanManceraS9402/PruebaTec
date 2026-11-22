@@ -1,7 +1,7 @@
 # PROGRESO · Estado del trabajo y cómo continuar
 
 > Bitácora de traspaso. **Borrarla del repo antes de la entrega** (son notas internas).
-> Última actualización: 2026-11-21.
+> Última actualización: 2026-11-22.
 
 ## 1. Contexto
 
@@ -25,9 +25,10 @@
 | Simulador | **10 vehículos, 6 rutas reales (OSRM)**, perfiles cumplido/moderado/agresivo, ruido, duplicados y outliers |
 | Geocercas | **2.257 reales** de datos abiertos (ver §4) |
 | Benchmark | 5,04 M de puntos, `docs/benchmark.md` actualizado con las geocercas reales |
-| Tablero Streamlit | Mapa (capas, leyenda, ortofoto IDECA híbrida), BI interactivo (ranking clicable, perfil del vehículo, infracciones por zona y en el tiempo), créditos al pie |
+| Tablero Streamlit | Mapa (capas, leyenda, ortofoto IDECA híbrida), BI interactivo (ranking clicable, perfil del vehículo, infracciones por zona y en el tiempo), filtro de placas con un clic, créditos al pie |
+| Simulador en el tablero | Solo administrador: ruta existente o dos clics en un mapa (OSRM), pipeline real, limpieza con **Borrar simulados** (`sandbox.py`, `routing.py`, `08_sandbox.sql`) |
 | Docs | `README.md`, `DESIGN.md`, `SETUP.md` y `docs/benchmark.md` al día, con fuentes y licencias |
-| Pruebas | 201 unitarias y 44 de integración. La CI corre las dos contra PostGIS real |
+| Pruebas | 229 unitarias y 54 de integración. La CI corre las dos contra PostGIS real |
 
 ## 3. Cómo levantar todo (este PC, sin Docker)
 
@@ -81,6 +82,8 @@ streamlit run dashboard/app.py                 # DESDE LA RAÍZ (lee .streamlit/
 - **Contraste para la demo:** VHC-6194-PLM (agresivo por Américas y NQS) frente a VHC-9053-HRD (cumplido, 100).
 
 ## 6. Pendiente para entregar
+
+0. **Pulsar Borrar simulados** antes de grabar: hay 4 vehículos de prueba en la base local.
 
 1. **Grabar el video** siguiendo `GUION_VIDEO.md`. Es local y está en `.gitignore`; tiene la sección de capas y una tabla de referencia rápida.
 2. **Subir el video** como no listado y poner el enlace en el README.

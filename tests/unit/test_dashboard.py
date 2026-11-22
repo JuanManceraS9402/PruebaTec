@@ -15,11 +15,13 @@ from simon_geo.dashboard.views import (
     HEATMAP_COLORS,
     SEVERITY_COLORS,
     build_legend,
+    compact_vehicle_labels,
     feature_collection,
     fleet_summary,
     geofences_on_paths,
     legend_html,
     line_path,
+    reconcile_selection,
     vehicle_label,
     view_for,
     with_colors,
@@ -189,6 +191,25 @@ class TestLegend:
         assert "<script>" not in out and "&lt;script&gt;" in out
         assert "linear-gradient" in out  # rampa del mapa de calor
         assert legend_html([]).count("No hay capas") == 1
+
+
+class TestVehicleFilter:
+    def test_labels_are_short(self) -> None:
+        labels = compact_vehicle_labels([("VHC-8472-ABC", "VK-1111"), ("VHC-****-QWE", "VK-2222")])
+        assert labels == {"VK-1111": "8472-ABC", "VK-2222": "****-QWE"}
+
+    def test_repeated_masked_ids_stay_distinct_without_revealing_digits(self) -> None:
+        labels = compact_vehicle_labels([("VHC-****-ABC", "VK-aaaa"), ("VHC-****-ABC", "VK-bbbb")])
+        assert labels == {"VK-aaaa": "****-ABC · aaaa", "VK-bbbb": "****-ABC · bbbb"}
+
+    def test_removed_vehicle_leaves_selection(self) -> None:
+        assert reconcile_selection(["a", "b"], ["a", "gone"], ["a", "b", "gone"]) == ["a"]
+
+    def test_new_vehicle_starts_on_but_hidden_ones_stay_off(self) -> None:
+        assert reconcile_selection(["a", "b", "new"], ["a"], ["a", "b"]) == ["a", "new"]
+
+    def test_none_selected_stays_empty(self) -> None:
+        assert reconcile_selection(["a", "b"], [], ["a", "b"]) == []
 
 
 class TestGeofencesOnPaths:

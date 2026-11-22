@@ -29,6 +29,7 @@ Al crear el volumen por primera vez, el contenedor ejecuta en orden los scripts 
 | `05_gold.sql` | Vistas materializadas para BI y función de Driver Score |
 | `06_security.sql` | Roles, enmascaramiento y esquema `analytics` |
 | `07_users.sh` | Usuarios de login con las contraseñas del `.env` |
+| `08_sandbox.sql` | Funciones del simulador del tablero (solo administrador) |
 
 `--wait` retorna cuando el healthcheck responde por TCP, es decir, cuando los scripts
 ya terminaron.
@@ -130,6 +131,20 @@ cobertura de la ortofoto se ve el mapa de CARTO. Ejecuta Streamlit desde la raí
 repositorio: `.streamlit/config.toml` activa el servidor estático que entrega el estilo
 (`dashboard/static/`). El estilo híbrido se genera al arrancar; sin internet queda la
 ortofoto sola.
+
+### Simular un vehículo
+
+Con la **API corriendo** (sección 5), entra como **Administrador** y abre **Simular
+vehículo** en la barra lateral:
+
+1. En **Ruta** elige una existente, o **En el mapa** para marcar inicio y fin con dos clics.
+   La ruta se calcula por las vías reales con el servicio público de OSRM (requiere internet).
+2. Indica placa (`VHC-1234-XYZ`), conductor, combustible, tanque, consumo y hora de salida.
+3. Pulsa **Simular**. El vehículo pasa por API, Bronce, worker, Plata y Oro, y queda
+   resaltado en fucsia con su Driver Score y sus alertas.
+
+**Borrar simulados** lo quita de todas las capas. Si la API no está en
+`http://localhost:8000`, define `API_URL` en el `.env`.
 
 ## 9. Benchmark (millones de puntos)
 

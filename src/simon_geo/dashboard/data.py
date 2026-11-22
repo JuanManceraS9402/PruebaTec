@@ -64,6 +64,13 @@ WHERE vehicle_key = %(vehicle_key)s
 ORDER BY event_ts
 """
 
+_SANDBOX_KEYS: Final = "SELECT vehicle_key FROM analytics.sandbox_vehicle"
+
+_VEHICLE_KEY: Final = """
+SELECT vehicle_key FROM analytics.vehicle_daily_kpi
+WHERE vehicle_id = %(vehicle_id)s AND local_day = %(day)s
+"""
+
 _WHOAMI: Final = "SELECT current_user, security.is_admin()"
 
 
@@ -98,6 +105,16 @@ def vehicle_profile(conn: psycopg.Connection, day: date, vehicle_key: str) -> pd
 
 def geofences(conn: psycopg.Connection) -> pd.DataFrame:
     return _frame(conn, _GEOFENCES)
+
+
+def sandbox_vehicle_keys(conn: psycopg.Connection) -> set[str]:
+    """Claves seudónimas de los vehículos creados con "Simular vehículo"."""
+    return {row[0] for row in conn.execute(_SANDBOX_KEYS).fetchall()}
+
+
+def vehicle_key_of(conn: psycopg.Connection, vehicle_id: str, day: date) -> str | None:
+    row = conn.execute(_VEHICLE_KEY, {"vehicle_id": vehicle_id, "day": day}).fetchone()
+    return row[0] if row else None
 
 
 def whoami(conn: psycopg.Connection) -> tuple[str, bool]:

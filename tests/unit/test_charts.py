@@ -83,6 +83,32 @@ def test_zone_chart_counts_and_uses_severity_palette(alerts) -> None:
     assert scale["range"] == [charts.hex_color(c) for c in SEVERITY_COLORS.values()]
 
 
+def test_zone_type_chart_has_one_bar_per_type() -> None:
+    alerts = pd.DataFrame(
+        {
+            "severity": ["LOW", "HIGH", "LOW", "CRITICAL"],
+            "zone_type": ["SCHOOL", "SCHOOL", "HIGH_RISK", None],
+            "geofence_name": ["Colegio A", "Colegio B", "Tramo", None],
+        }
+    )
+    rows = datasets(charts.infractions_by_zone_type(alerts))[0]
+    assert {r["zone"] for r in rows} == {
+        "Zona escolar",
+        "Alta siniestralidad",
+        "Fuera de geocerca",
+    }
+    assert sum(r["size"] for r in rows) == len(alerts)
+
+
+def test_top_zones_folds_the_rest_without_losing_alerts() -> None:
+    names = ["A", "A", "A", "B", "B", "C", "D"]
+    alerts = pd.DataFrame({"severity": ["LOW"] * len(names), "geofence_name": names})
+    chart = charts.infractions_by_zone(alerts, top=2)
+    rows = datasets(chart)[0]
+    assert {r["zone"]: r["size"] for r in rows} == {"A": 3, "B": 2, "Otras 2 zonas": 2}
+    assert chart.to_dict()["encoding"]["y"]["sort"] == ["A", "B", "Otras 2 zonas"]
+
+
 @pytest.mark.parametrize(
     ("span", "minutes"),
     [(pd.Timedelta(minutes=40), 5), (pd.Timedelta(hours=5), 15), (pd.Timedelta(hours=20), 60)],

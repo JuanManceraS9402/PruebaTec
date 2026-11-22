@@ -169,6 +169,30 @@ exactamente sobre el borde queda **fuera**. Un vehículo que circula por la call
 limita una zona escolar no se evaluaría con el límite escolar. `ST_Intersects` cuenta el
 borde como dentro, que es la interpretación conservadora para seguridad vial.
 
+La elección solo cambia ese caso límite. Sobre la telemetría del escenario de demo
+(4.940 puntos, 10 vehículos, 2.257 geocercas) los tres operadores dan el mismo resultado,
+porque ningún punto cae exactamente sobre un borde:
+
+| Operador | Pares punto-geocerca |
+|---|---:|
+| `ST_Intersects(g.geom, b.geom)` | 7.341 |
+| `ST_Within(b.geom, g.geom)` | 7.341 |
+| `ST_Contains(g.geom, b.geom)` | 7.341 |
+
+```sql
+WITH j AS (
+  SELECT ST_Intersects(g.geom, b.geom) AS i,
+         ST_Within(b.geom, g.geom)     AS w,
+         ST_Contains(g.geom, b.geom)   AS c
+  FROM bronze.telemetry_raw b
+  JOIN ref.geofence g ON g.active AND g.geom && b.geom
+)
+SELECT count(*) FILTER (WHERE i) AS n_intersects,
+       count(*) FILTER (WHERE w) AS n_within,
+       count(*) FILTER (WHERE c) AS n_contains
+FROM j;
+```
+
 **En memoria (modo tiempo real):** `GeofenceIndex` usa un `STRtree` de Shapely (R-tree,
 el equivalente del GiST) con el mismo predicado. Un test de integración
 (`test_postgis_geofences_match_python_index`) verifica que **PostGIS y Python asignan
@@ -402,6 +426,21 @@ cualquier herramienta de BI conectada directamente a la base (Power BI, Metabase
 
 ---
 
+### Simulador del tablero
+
+El administrador puede preguntar "¿qué pasa si este vehículo va por esta ruta?". La
+simulación **no toma atajos**: registra el vehículo, envía su telemetría a la API y
+ejecuta el worker, cada paso con su propio rol (`sandbox.py`).
+
+* El tablero no usa la cuenta dueña del esquema. `admin_demo` solo puede ejecutar
+  `ops.sandbox_register`, `ops.sandbox_register_with_route` y `ops.sandbox_purge`
+  (`SECURITY DEFINER`), que únicamente crean y borran vehículos `SANDBOX` y sus rutas
+  `SBX-*`. La flota real no se puede sobrescribir ni borrar por este camino.
+* Es la **única excepción** a la inmutabilidad de Bronce, y solo afecta a datos simulados.
+* Si un paso falla, el vehículo se borra: no quedan datos a medias.
+* El selector usa Folium porque el mapa de pydeck en Streamlit no entrega la coordenada de
+  un clic libre. La ruta se calcula con OSRM, al que solo se envían las dos coordenadas.
+
 ## 8. Trade-offs y escalamiento a Big Data
 
 ### Decisiones tomadas para el volumen
@@ -439,6 +478,13 @@ cualquier herramienta de BI conectada directamente a la base (Power BI, Metabase
    Plata permitiría mapas de calor jerárquicos y joins por celda sin geometrías.
 
 ### Limitaciones conocidas
+
+* El selector **Ver como** del tablero es una demostración de los dos roles y no tiene
+  inicio de sesión: quien abra el tablero puede elegir Administrador. La base sí aplica
+  los permisos de cada usuario, pero en producción el rol debe salir de una autenticación
+  real (SSO u OIDC), y el tablero no debe exponerse sin ella.
+* Las rutas marcadas en el mapa dependen del servidor público de demostración de OSRM. En
+  producción se usaría una instancia propia.
 
 * Con datos tardíos, el lookback del worker es de 2 h fijas. Un hueco mayor reinicia el
   estado de la traza, lo que afecta a la ventana de consumo y al episodio en curso.

@@ -16,7 +16,7 @@ from typing import Final
 import altair as alt
 import pandas as pd
 
-from simon_geo.dashboard.views import SEVERITY_COLORS
+from simon_geo.dashboard.views import SEVERITY_COLORS, ZONE_LABELS
 
 SEVERITY_ORDER: Final = list(SEVERITY_COLORS)
 SEVERITY_SHORT: Final = {"LOW": "Baja", "MEDIUM": "Media", "HIGH": "Alta", "CRITICAL": "Crítica"}
@@ -25,6 +25,9 @@ ALERT_RED: Final = "#c8102e"
 # Gris medio: se lee sobre fondo claro y oscuro. Los textos no llevan color fijo,
 # lo pone el tema de Streamlit (claro u oscuro).
 INK_MUTED: Final = "#8a8f98"
+OUTSIDE_LABEL: Final = "Fuera de geocerca"
+TOP_ZONES: Final = 8
+ZONE_ROW_PX: Final = 24
 SELECTION: Final = "vehiculo"  # nombre del parámetro de selección del ranking
 
 
@@ -102,19 +105,18 @@ def _with_severity(alerts: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def infractions_by_zone(alerts: pd.DataFrame) -> alt.Chart:
-    """Infracciones del día por geocerca, apiladas por severidad."""
-    frame = _with_severity(alerts).assign(zone=alerts["geofence_name"].fillna("Fuera de geocerca"))
+def _zone_bars(frame: pd.DataFrame, order: Sequence[str]) -> alt.Chart:
+    """Barras horizontales compactas por ``zone``, apiladas por severidad."""
     counts = frame.groupby(["zone", "sev", "sev_order"], as_index=False).size()
     return (
         alt.Chart(counts)
-        .mark_bar(height={"band": 0.62})
+        .mark_bar(height={"band": 0.68})
         .encode(
-            y=alt.Y("zone:N", sort="-x", title=None, axis=alt.Axis(labelLimit=200)),
+            y=alt.Y("zone:N", sort=list(order), title=None, axis=alt.Axis(labelLimit=210)),
             x=alt.X("sum(size):Q", title="Infracciones", axis=_axis(tickMinStep=1)),
             color=alt.Color(
                 "sev:N",
-                title="Severidad",
+                title=None,
                 scale=_severity_scale(),
                 legend=alt.Legend(orient="top"),
             ),
@@ -125,8 +127,34 @@ def infractions_by_zone(alerts: pd.DataFrame) -> alt.Chart:
                 alt.Tooltip("size:Q", title="Infracciones"),
             ],
         )
-        .properties(height=alt.Step(30))
+        .properties(height=alt.Step(ZONE_ROW_PX))
     )
+
+
+def _by_total(zones: pd.Series) -> list[str]:
+    """Zonas de mayor a menor; a igual total, por nombre (orden estable)."""
+    totals = zones.value_counts().rename_axis("zone").reset_index(name="n")
+    return totals.sort_values(["n", "zone"], ascending=[False, True])["zone"].tolist()
+
+
+def infractions_by_zone_type(alerts: pd.DataFrame) -> alt.Chart:
+    """Infracciones del día por tipo de zona: como máximo una barra por tipo."""
+    zone = alerts["zone_type"].map(ZONE_LABELS).fillna(OUTSIDE_LABEL)
+    frame = _with_severity(alerts).assign(zone=zone)
+    return _zone_bars(frame, _by_total(zone))
+
+
+def infractions_by_zone(alerts: pd.DataFrame, top: int = TOP_ZONES) -> alt.Chart:
+    """Las ``top`` geocercas con más infracciones; el resto se agrupa en una sola barra."""
+    zone = alerts["geofence_name"].fillna(OUTSIDE_LABEL)
+    ranked = _by_total(zone)
+    kept, rest = ranked[:top], ranked[top:]
+    order = list(kept)
+    if rest:
+        other = f"Otras {len(rest)} zonas"
+        zone = zone.where(zone.isin(kept), other)
+        order.append(other)
+    return _zone_bars(_with_severity(alerts).assign(zone=zone), order)
 
 
 def time_bucket_minutes(span: pd.Timedelta) -> int:

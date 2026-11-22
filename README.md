@@ -17,6 +17,8 @@ la enriquece con geocercas, genera alertas y expone KPIs de *Driver Score* para 
   alerta si no alcanza para terminar la **ruta asignada**.
 * **Capa Oro** con vistas materializadas (KPIs diarios, Driver Score, malla de 250 m y
   zonas calientes por DBSCAN en EPSG:9377) y un **tablero Streamlit** con mapa.
+* **Simulador en el tablero:** marcas inicio y fin en un mapa, eliges conductor y
+  combustible, y el vehículo recorre el pipeline real (API → Bronce → worker → Oro).
 * **Benchmark** con millones de puntos que compara planes con y sin GiST/BRIN y con y
   sin poda de particiones.
 
@@ -67,7 +69,8 @@ flowchart LR
 │   ├── 04_silver.sql           #   Telemetría enriquecida y alertas
 │   ├── 05_gold.sql             #   Vistas materializadas y Driver Score
 │   ├── 06_security.sql         #   Roles, enmascaramiento, esquema analytics
-│   └── 07_users.sh             #   Usuarios de login
+│   ├── 07_users.sh             #   Usuarios de login
+│   └── 08_sandbox.sql          #   Funciones del simulador (solo administrador)
 ├── src/simon_geo/
 │   ├── api/                    # FastAPI: ingesta por lotes y lectura de alertas por rol
 │   ├── spatial/                # CRS (EPSG:9377), haversine, geocercas (STRtree), rutas
@@ -76,6 +79,8 @@ flowchart LR
 │   ├── simulator/              # Flota simulada (perfiles, ruido, duplicados, outliers)
 │   ├── seed/                   # Escenario Bogotá
 │   ├── benchmark/              # Generador masivo y lectura de planes EXPLAIN
+│   ├── sandbox.py              # Simulación bajo demanda de un vehículo
+│   ├── routing.py              # Ruta por vías entre dos puntos (OSRM)
 │   └── dashboard/              # Consultas, gráficos y transformaciones del tablero
 ├── dashboard/app.py            # Tablero Streamlit + pydeck (mapa base CARTO u ortofoto)
 ├── scripts/                    # Descarga de rutas (OSRM) y geocercas (datos abiertos)
@@ -120,7 +125,7 @@ Las pruebas cubren lo crítico del dominio:
 
 | Dato | Fuente | Licencia |
 |---|---|---|
-| Rutas y corredores | © colaboradores de [OpenStreetMap](https://www.openstreetmap.org/copyright), calculadas con [OSRM](https://project-osrm.org/) | ODbL |
+| Rutas, corredores y mapa del selector de puntos | © colaboradores de [OpenStreetMap](https://www.openstreetmap.org/copyright), calculadas con [OSRM](https://project-osrm.org/) | ODbL |
 | Perímetro urbano (POT) | [Secretaría Distrital de Planeación](https://datosabiertos.bogota.gov.co/dataset/perimetro-urbano-bogota-d-c) | CC BY 4.0 |
 | Zonas escolares | [Colegios Bogotá D.C.](https://datosabiertos.bogota.gov.co/dataset/colegios-bogota-d-c), Secretaría de Educación del Distrito | CC BY-SA 4.0 |
 | Tramos y puntos críticos de siniestralidad 2022–2025 | [Oficina de Seguridad Vial, Secretaría Distrital de Movilidad](https://sig.simur.gov.co/arcgis/rest/services/DatosAbiertos) | CC BY 4.0 |
