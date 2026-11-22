@@ -27,6 +27,7 @@ Thumbs.db
 
 # Notas personales
 GUION_VIDEO.md
+preparar_video.ps1
 
 # Estilo de mapa híbrido generado por el tablero al arrancar
 dashboard/static/ortofoto_hibrida.json
