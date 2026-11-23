@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/JuanManceraS9402/PruebaTec/actions/workflows/ci.yml/badge.svg)](https://github.com/JuanManceraS9402/PruebaTec/actions/workflows/ci.yml)
 
+**[▶ Ver el video de la solución (4:34)](https://drive.google.com/file/d/19eWr2tHXEOfCehGEjGtlpuai3H7tUtob/view?usp=drive_link)**
+
 Pipeline **Bronce → Plata → Oro** sobre PostgreSQL + PostGIS. Ingiere telemetría IoT/AVL,
 la enriquece con geocercas, genera alertas y expone KPIs de *Driver Score* para BI:
 
